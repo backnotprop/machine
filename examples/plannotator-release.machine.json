@@ -1,0 +1,173 @@
+{
+  "id": "plannotator-release",
+  "version": 1,
+  "name": "Release Plannotator",
+  "description": "Take main from the last tag to a shipped, smoke-tested Plannotator release: scope what ships, QA for regressions, write terse notes, bump the seven version files, build, tag, watch the pipeline, publish the notes, then smoke-test the installs.",
+  "inputs": {
+    "repo_path": { "type": "string", "required": true, "description": "Absolute path to the Plannotator checkout, on main" },
+    "version": { "type": "string", "required": true, "description": "Version to ship, e.g. 0.28.24 (no leading v)" },
+    "include_prs": { "type": "string", "required": false, "description": "PR numbers to merge before shipping, comma-separated. Empty: ship main as it is" }
+  },
+  "requirements": [
+    { "id": "on-main-clean", "description": "repo_path is on main with a clean tree (untracked RELEASE_NOTES_*.md files are fine, they stay untracked by design)",
+      "check": "Run `git -C <repo_path> status --porcelain --branch`; ok if the first line starts with `## main` and every other line starts with `?? RELEASE_NOTES_`" },
+    { "id": "main-up-to-date", "description": "Local main matches origin/main",
+      "check": "Run `git -C <repo_path> fetch origin` then `git -C <repo_path> rev-list --left-right --count main...origin/main`; ok if it prints `0 0`" },
+    { "id": "version-is-new", "description": "The version is not already tagged and is higher than the latest tag",
+      "check": "Run `git -C <repo_path> tag -l v<version>` (must print nothing) and `git -C <repo_path> tag --sort=-v:refname | head -1` (must be lower than v<version>)" },
+    { "id": "gh-ready", "description": "gh is logged in and can see the repository",
+      "check": "Run `gh auth status` and `gh repo view --json nameWithOwner` in repo_path; ok if both succeed" },
+    { "id": "bun-pinned", "description": "Local bun is the version the release workflow pins (builds made with a newer bun have shipped broken before)",
+      "check": "Compare `bun --version` with the `bun-version:` value in <repo_path>/.github/workflows/release.yml; ok if equal" },
+    { "id": "aws-creds", "required": false, "description": "AWS credentials for the install-scripts bucket (only needed when scripts/install.* changed)",
+      "check": "Run `aws sts get-caller-identity`; ok if it prints an account" }
+  ],
+  "initial": "scope",
+  "states": {
+    "scope": {
+      "kind": "task",
+      "title": "Scope the release",
+      "instructions": "Find the latest tag (`git tag --sort=-v:refname | head -1`) and list `git log --oneline <tag>..HEAD`. If include_prs names PRs: for each, wait for its CI and review to finish, merge it on GitHub in a sensible order, then `git pull`. A PR that is not clean waits for the next release; say which and why with `machine.note`. Record whether `scripts/install.sh`, `install.ps1` or `install.cmd` changed since the tag (`git diff --stat <tag>..HEAD -- scripts/install.*`) and whether dependencies changed (`package.json`, `bun.lock`, any `*/package.json`). Do not change code here.",
+      "output": {
+        "last_tag": { "type": "string", "required": true },
+        "commit_count": { "type": "number", "required": true, "description": "Commits between last_tag and HEAD after merging" },
+        "prs_merged": { "type": "number", "required": true },
+        "install_scripts_changed": { "type": "boolean", "required": true },
+        "deps_changed": { "type": "boolean", "required": true }
+      },
+      "on": {
+        "scoped": { "to": "qa", "description": "There is something to ship" },
+        "nothing_to_ship": { "to": "empty", "description": "No commits since the last tag" }
+      }
+    },
+    "qa": {
+      "kind": "task",
+      "title": "QA for regressions",
+      "instructions": "The checklist is ~/QA/QA.md. Its purpose is one thing: nothing breaks for existing users when this ships. Pick the checks that the diff since last_tag actually touches, and always run these: builds and the main commands; the Pi and OpenCode packages (OpenCode 1 and 2 share one code base); prompt caching unchanged for Pi and OpenCode; npm installs (Pi, OpenCode) behave like the script installs; annotate toolbar keeps every button; remote users still see output URLs. When install_scripts_changed is true, exercise the scripts against an existing install and a clean one. When the diff is large, run three independent sweeps with different angles so nothing is missed. Report each check with `machine.note` as it finishes. Do not grow the list, do not redevelop anything, do not fix here: record what is broken and move on. A regression is a behaviour that worked at last_tag and does not now.",
+      "output": {
+        "checks_run": { "type": "number", "required": true },
+        "regressions": { "type": "number", "required": true, "description": "Regressions found in this pass" },
+        "summary": { "type": "string", "required": true, "description": "One line per check: name, result" }
+      },
+      "on": {
+        "clean": { "to": "notes", "description": "No regressions: regressions = 0" },
+        "regressions_found": { "to": "patch", "description": "At least one regression to fix before shipping" }
+      }
+    },
+    "patch": {
+      "kind": "task",
+      "title": "Patch what QA found",
+      "instructions": "Fix only the regressions QA listed, in the smallest clean change, with a test where one fits. Land each fix on main the way the repo does it (PR with green CI, or a direct commit when that is the norm), then pull so local main is up to date again. If a fix is not small and clean, do not force it: call `machine.fail` with needs saying what the owner must decide (drop the change, revert the PR, or accept the risk). Then go back to QA; it re-runs only the affected checks.",
+      "output": {
+        "fixed": { "type": "array", "required": true, "description": "One line per regression fixed, with the commit or PR" }
+      },
+      "on": {
+        "patched": { "to": "qa", "description": "Fixes landed; QA re-checks the affected areas" }
+      }
+    },
+    "notes": {
+      "kind": "task",
+      "title": "Write the release notes",
+      "instructions": "Write `RELEASE_NOTES_v<version>.md` at the repo root (if it exists from an earlier pass, update it). Keep it untracked; never `git add` it. The notes are pre-approved: do not wait for review. Follow the release-plannotator skill's structure (follow link, missed-releases table, What's New, install block copied from the previous notes, What's Changed, New Contributors, Community, Full Changelog link) and its writing rule: succinct and terse. Per feature a short heading, one to three sentences on what it does for the user, the PR link. Fixes are one line each under Additional Changes. Credit every contributor, reporter and commenter with bare @mentions, in short lines. No backstory, no hype, no punchlines.",
+      "output": {
+        "path": { "type": "string", "required": true, "description": "Absolute path of the notes file" },
+        "features": { "type": "number", "required": true, "description": "Number of What's New subsections" }
+      },
+      "on": {
+        "drafted": { "to": "bump" }
+      }
+    },
+    "bump": {
+      "kind": "task",
+      "title": "Bump the version",
+      "instructions": "Set the version in exactly these seven files and no others: `package.json`, `apps/opencode-plugin/package.json`, `apps/pi-extension/package.json`, `apps/hook/.claude-plugin/plugin.json`, `apps/copilot/plugin.json`, `openpackage.yml`, `packages/server/package.json`. Not the VS Code extension. First confirm all seven show the same current version; if they already show <version> from an earlier pass, verify and skip the commit. Commit the seven files alone as `chore: bump version to <version>`. Do not push yet.",
+      "output": {
+        "files_changed": { "type": "number", "required": true, "description": "Files in the bump commit; must be 7" },
+        "commit": { "type": "string", "required": true, "description": "Short SHA of the bump commit" }
+      },
+      "on": {
+        "bumped": { "to": "build" }
+      }
+    },
+    "build": {
+      "kind": "task",
+      "title": "Build and check Pi parity",
+      "instructions": "If deps_changed, run `bun install` first. Then, in order: `bun run build:review`, `bun run build:hook`, `bun run build:opencode`, `bun run build:pi`. All four must succeed. Then the Pi parity gate: every local import from the Pi extension's server files is covered by the `files` array of `apps/pi-extension/package.json`; every `../generated/*` import has a copy loop in `vendor.sh`; `cd apps/pi-extension && bun pm pack --dry-run` lists every file the server imports; `generated/` holds every expected file. Fix a parity gap in place (vendor.sh, files array, import path) and commit it. A failing build or a gap you cannot fix in place is a regression: fire `build_broken`.",
+      "output": {
+        "builds_ok": { "type": "boolean", "required": true },
+        "pi_parity": { "type": "string", "required": true, "enum": ["ok", "fixed", "not_applicable"], "description": "not_applicable only when the repo has no Pi extension" }
+      },
+      "on": {
+        "built": { "to": "tag", "description": "Four builds green, parity ok" },
+        "build_broken": { "to": "patch", "description": "A build or the parity gate failed and needs a real fix" }
+      }
+    },
+    "tag": {
+      "kind": "task",
+      "title": "Push and tag",
+      "instructions": "`git push origin main`, then `git tag v<version>` and `git push origin v<version>`. The tag push starts the release workflow. Releases are immutable: never delete or move a tag, whatever goes wrong after this point. A bad release is fixed by shipping the next version.",
+      "output": {
+        "tag": { "type": "string", "required": true },
+        "commit": { "type": "string", "required": true, "description": "Short SHA the tag points at" }
+      },
+      "on": {
+        "tagged": { "to": "pipeline" }
+      }
+    },
+    "pipeline": {
+      "kind": "task",
+      "title": "Watch the release pipeline",
+      "instructions": "Find the run for the tag with `gh run list --workflow=release.yml --limit=3` and watch it to the end (`gh run watch <id>` or poll `gh run view <id>`), posting a `machine.note` as jobs finish. Green means: every job passed, including test, build, smoke-binaries, release-security, attest, release and npm-publish; the GitHub release exists with the binaries, their .sha256 sidecars and the release SBOM; `npm view @plannotator/opencode version` and `npm view @plannotator/pi-extension version` both print <version> (the registry can lag a few minutes; retry before calling it red). On a failure, read the failing job's log and put the job name and the key lines in the note so the owner can decide.",
+      "output": {
+        "run_id": { "type": "string", "required": true },
+        "jobs_green": { "type": "boolean", "required": true },
+        "npm_versions": { "type": "string", "required": true, "description": "e.g. opencode 0.28.24, pi-extension 0.28.24" }
+      },
+      "on": {
+        "green": { "to": "publish" },
+        "red": { "to": "pipeline_red", "description": "A job failed; the owner decides whether to rerun or give up" }
+      }
+    },
+    "pipeline_red": {
+      "kind": "wait",
+      "title": "Pipeline failed: owner decides",
+      "instructions": "Report the failing job and why in a note. Do not touch the tag.",
+      "on": {
+        "rerun": { "to": "pipeline", "actor": "human", "description": "Rerun the failed jobs (`gh run rerun <id> --failed`) and watch again" },
+        "give_up": { "to": "pipeline_failed", "actor": "human", "description": "Leave this version unreleased; the fix ships as the next version" }
+      }
+    },
+    "publish": {
+      "kind": "task",
+      "title": "Publish the notes and served scripts",
+      "instructions": "Replace the auto-generated release body: `gh release edit v<version> --notes-file RELEASE_NOTES_v<version>.md`. If install_scripts_changed: copy `scripts/install.sh`, `install.ps1`, `install.cmd` to the `plannotator-install-scripts` S3 bucket with the content types the release-plannotator skill lists, invalidate `/install.sh /install.ps1 /install.cmd` on CloudFront distribution E284ON0A27O2H6, then confirm `curl -fsSL https://plannotator.ai/<file> | md5 -q` equals `md5 -q scripts/<file>` for all three. There is no CI sync for that bucket; this is the only way the served scripts update.",
+      "output": {
+        "notes_published": { "type": "boolean", "required": true },
+        "install_scripts": { "type": "string", "required": true, "enum": ["unchanged", "synced"] }
+      },
+      "on": {
+        "published": { "to": "smoke" }
+      }
+    },
+    "smoke": {
+      "kind": "task",
+      "title": "Smoke-test the installs",
+      "instructions": "Two installs, in this order, each followed by a smoke test (`plannotator --version` prints <version>; `plannotator help`, `plannotator review` and `plannotator annotate` start; an existing Inbox store still opens): first install over the existing install with the published install script, then remove Plannotator from the machine and install fresh. Then the agents: load the OpenCode plugin at <version> (OpenCode 1, and 2 if installed here) and the Pi extension from npm; mark one `skipped` only when that agent is not installed on this machine. Set `PLANNOTATOR_BROWSER=none` so no tabs open (`NO_BROWSER` is a test-helper name and does nothing). Leave the machine on <version> and tell the owner to restart Claude Code and the Inbox.",
+      "output": {
+        "upgrade_install": { "type": "string", "required": true, "enum": ["pass", "fail"] },
+        "fresh_install": { "type": "string", "required": true, "enum": ["pass", "fail"] },
+        "opencode": { "type": "string", "required": true, "enum": ["pass", "fail", "skipped"] },
+        "pi": { "type": "string", "required": true, "enum": ["pass", "fail", "skipped"] },
+        "summary": { "type": "string", "required": true }
+      },
+      "on": {
+        "passed": { "to": "shipped", "description": "Nothing failed" },
+        "broken": { "to": "shipped_broken", "description": "Something failed on the released build" }
+      }
+    },
+    "shipped": { "kind": "final", "title": "Shipped and smoke-tested", "outcome": "success" },
+    "empty": { "kind": "final", "title": "Nothing to ship", "outcome": "success" },
+    "pipeline_failed": { "kind": "final", "title": "Release abandoned at the pipeline", "outcome": "failure" },
+    "shipped_broken": { "kind": "final", "title": "Released, but smoke tests failed: open an issue and start the next version", "outcome": "failure" }
+  }
+}

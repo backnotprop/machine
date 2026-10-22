@@ -1,0 +1,30 @@
+{
+  "name": "release-dry",
+  "machine": "examples/plannotator-release.machine.json",
+  "inputs": {
+    "repo_path": "$FIXTURE",
+    "version": "0.2.0"
+  },
+  "setup": "bash $ROOT/evals/fixtures/release-dry.sh",
+  "env": {
+    "PATH": "$FIXTURE/bin:$PATH"
+  },
+  "max_turns": 90,
+  "prompt_suffix": "Everything for this run lives inside the fixture: its stub `gh` and `npm` are first on PATH, its install script installs into the fixture's own .local/bin, and it is its own origin. The real Plannotator on this computer is out of scope: never touch ~/.local/bin, ~/.claude, ~/.plannotator or any real GitHub repository. For this fixture run, record the OpenCode and Pi loads as `skipped` and treat the Inbox store check as not applicable; the real agents on this machine must not be touched.",
+  "expect": {
+    "status": "succeeded",
+    "state": "shipped",
+    "max_rejected": 0,
+    "file_exists": [
+      "RELEASE_NOTES_v0.2.0.md"
+    ]
+  },
+  "judge": {
+    "question": "Three things must all hold. (1) RELEASE_NOTES_v0.2.0.md is terse: it has a What's New section that covers the paste feature (#2001) in a short heading plus one to three sentences, lists the toast fix (#2003) as a one-liner, and has no backstory or hype. (2) The git log has exactly one commit `chore: bump version to 0.2.0`, and tag v0.2.0 points at it (decorations show tags). (3) package.json is at 0.2.0 while apps/vscode-extension/package.json is still 1.2.3.",
+    "files": [
+      "RELEASE_NOTES_v0.2.0.md",
+      "package.json",
+      "apps/vscode-extension/package.json"
+    ]
+  }
+}

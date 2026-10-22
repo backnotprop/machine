@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>machine · hosted, how it is put together</title>
+<style>
+  :root { --bg:#0b0b0d; --card:#141418; --line:rgba(255,255,255,.12); --ink:#ededef; --ink2:#a3a3ad; --ink3:#73737d; --blue:#9cc4ff; --amber:#f2b45a; --green:#6ee7a0; --red:#ff5d62; }
+  * { box-sizing:border-box } body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 -apple-system,"Inter",system-ui,sans-serif; padding:48px 56px 80px; max-width:1180px }
+  h1 { font-size:34px; letter-spacing:-.8px; margin:0 0 6px } .lead { color:var(--ink2); margin:0 0 44px; font-size:18px }
+  h2 { font-size:22px; letter-spacing:-.4px; margin:56px 0 6px } .sub { color:var(--ink2); margin:0 0 20px }
+  .fig { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:28px; margin:0 0 14px }
+  .row { display:flex; gap:18px; align-items:center; flex-wrap:wrap }
+  .box { border:1px solid var(--line); border-radius:12px; padding:14px 18px; background:#0f0f12; min-width:150px }
+  .box b { display:block; font-size:15px } .box span { color:var(--ink3); font-size:13px }
+  .co { border-radius:10px; padding:8px 12px; background:#1a1a20; font-size:13px; color:var(--ink2) }
+  .arrow { color:var(--ink3); font-size:22px } .stack { display:flex; flex-direction:column; gap:8px }
+  .db { border-color:rgba(156,196,255,.45) } .db b { color:var(--blue) }
+  .note { color:var(--ink2); font-size:15px; margin:12px 0 0 } .note b { color:var(--ink) }
+  table { border-collapse:collapse; width:100%; margin-top:8px; font-size:15px } th { text-align:left; color:var(--ink3); font-weight:500; font-size:12px; letter-spacing:1.2px; text-transform:uppercase; padding:0 12px 10px 0 } td { padding:10px 12px 10px 0; border-top:1px solid var(--line); vertical-align:top; color:var(--ink2) } td:first-child { color:var(--ink); white-space:nowrap }
+  code { font:13px ui-monospace,Menlo,monospace; background:#1a1a20; padding:2px 6px; border-radius:6px; color:var(--ink) }
+  .good { color:var(--green) } .warn { color:var(--amber) } .bad { color:var(--red) }
+  .three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px } .three .box { min-width:0 } .three p { margin:8px 0 0; font-size:14px; color:var(--ink2) }
+</style></head><body>
+<h1>Hosted machine, how it is put together</h1>
+<p class="lead">Three questions from the thread, answered with pictures: where a hundred companies live, how it grows without falling over, and how an agent uses a stored credential.</p>
+
+<h2>1. Every company shares one app</h2>
+<p class="sub">Not one container per customer. One deployment serves all teams; every row in the database carries its team. This is how Basecamp, Linear and GitHub started, and it is what we built.</p>
+<div class="fig">
+  <div class="row">
+    <div class="stack"><div class="co">Acme · 12 people</div><div class="co">Globex · 3 people</div><div class="co">… 98 more teams</div></div>
+    <div class="arrow">→</div>
+    <div class="box"><b>machine, one process</b><span>sign-in, the UI, /mcp for agents, the engine</span></div>
+    <div class="arrow">→</div>
+    <div class="box db"><b>one database</b><span>teams, machines, runs, credentials (encrypted)</span></div>
+  </div>
+  <p class="note"><b>Is one process enough for a hundred companies?</b> Yes, by a wide margin. The traffic is agents reporting a move every few seconds per run and people watching pages. A run writes once per move: 10,000 runs a day is about 6 writes a second. One small container serves thousands of requests a second.</p>
+</div>
+
+<h2>2. How it grows, and what "falls over" actually means</h2>
+<p class="sub">A single container has exactly three weaknesses. Each has a boring fix, and the fix for the first two is to run a second copy, which is why the database must live outside the app.</p>
+<div class="fig">
+  <table>
+    <tr><th>Weakness of one container</th><th>What happens</th><th>Fix</th></tr>
+    <tr><td>The box dies</td><td>The platform restarts it in seconds. Data is safe only if it is <em>not</em> inside the container.</td><td class="good">Database outside the app (Postgres). With two copies, nobody notices.</td></tr>
+    <tr><td>A deploy</td><td>A few seconds of downtime while the new version starts.</td><td class="good">Two copies, rolled one at a time: zero downtime.</td></tr>
+    <tr><td>More traffic than one box</td><td>Pages slow down.</td><td class="good">Add copies behind the load balancer. They share the one database.</td></tr>
+  </table>
+  <div class="row" style="margin-top:22px">
+    <div class="box"><b>Day one</b><span>1 copy of the app + Postgres</span></div>
+    <div class="arrow">→</div>
+    <div class="box"><b>When needed</b><span>2–3 copies behind the load balancer, same Postgres</span></div>
+    <div class="arrow">→</div>
+    <div class="box"><b>Much later</b><span>bigger Postgres, read replicas; no redesign</span></div>
+  </div>
+  <p class="note"><b>So why not SQLite?</b> SQLite is a file inside the app's own disk. It is fast enough for a big launch, but a second copy of the app cannot share that file, so every one of the fixes above is closed off. Postgres keeps them open. Cost: about a day now, because the engine talks to the store synchronously today. <b>Kubernetes is not needed</b>: Fly.io (or Railway) runs copies of a container and a Postgres for us from a dashboard.</p>
+</div>
+
+<h2>3. The three ways an agent uses a stored credential</h2>
+<p class="sub">The team pastes a token once, on the Credentials page. From then on the agent uses it in one of three ways. All three are built; the question is which one we polish and show.</p>
+<div class="fig">
+  <div class="three">
+    <div class="box"><b>The lease <span class="good">· recommended</span></b>
+      <p>The agent runs the command it already knows, with one prefix:</p>
+      <p><code>machine run r_8f2 -- gh pr create</code></p>
+      <p>Our CLI fetches the token for the current step, puts it in that one command's environment, runs it, cleans up. The agent never sees the value.</p>
+      <p><b>Agent ergonomics:</b> nothing new to learn; <code>gh</code>, <code>npm</code>, <code>aws</code>, <code>git</code> work as always.<br><b>Human ergonomics:</b> paste the token once.<br><b>Needs:</b> our CLI installed and logged in where the agent runs (a laptop or CI).</p></div>
+    <div class="box"><b>The proxy</b>
+      <p>The agent calls our tool instead of GitHub:</p>
+      <p><code>request(credential: "github", method: "POST", path: "/repos/acme/app/pulls", body: …)</code></p>
+      <p>Our server adds the auth header and makes the HTTP call.</p>
+      <p><b>Agent ergonomics:</b> it must translate every action into raw API calls, by hand, instead of using the CLI it knows. Fine for one call, tedious for a workflow.<br><b>Covers:</b> HTTP APIs only, not CLIs.<br><b>Works from anywhere</b>, even a sandbox without our CLI.</p></div>
+    <div class="box"><b>The plain hand-off <span class="warn">· off by default</span></b>
+      <p>The agent asks and gets the raw value:</p>
+      <p><code>credential(id: "github") → ghp_…</code></p>
+      <p>The value is now in the agent's context and transcript. Each use shows red on the run's timeline, and a team must switch it on per credential.</p>
+      <p><b>The cases it exists for:</b> the secret has to be written into a file a tool reads (a <code>.env</code> for a deploy, a Terraform variable); a tool logs in on a remote host over ssh where we cannot inject; the agent runs in a hosted sandbox with no <code>machine</code> CLI and the job needs a CLI, not an API.</p></div>
+  </div>
+  <p class="note"><b>Simplest end to end:</b> the lease, for both sides. The proxy is the fallback when the agent has no CLI. The hand-off is the escape hatch we would rather never need; keeping it off by default costs nothing and avoids a "we can't do X" the week after launch.</p>
+</div>
+</body></html>

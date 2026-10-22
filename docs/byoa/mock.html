@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Connect your agent · designer mock</title>
+<style>
+  @font-face { font-family: "Inter Variable"; font-weight: 100 900; src: url("file:///Users/ramos/oss/machine/node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2"); }
+  @font-face { font-family: "IoskeleyMono"; font-weight: 400; src: url("file:///Users/ramos/oss/machine/src/ui/public/fonts/IoskeleyMono-Regular.woff2") format("woff2"); }
+  :root { color-scheme: dark;
+    --gray-1:#111; --gray-2:#191919; --gray-3:#222; --gray-4:#2a2a2a; --gray-6:#3a3a3a; --gray-11:#b4b4b4; --gray-12:#eee;
+    --gray-a2:#ffffff09; --gray-a3:#ffffff12; --gray-a4:#ffffff1b; --gray-a6:#ffffff2c; --gray-a8:#fff5; --gray-a9:#ffffff64; --gray-a11:#ffffffaf; --gray-a12:#ffffffed;
+    --blue-9:#0090ff; --blue-a3:#0077ff3a; --blue-a6:#0f89fd7f; --blue-a10:#3b9eff; --green-9:#30a46c; --green-a3:#22ff991e; --green-a10:#43fea4ab; --green-11:#3dd68c;
+    --orange-a3:#fb6a0025; --orange-a10:#ff801f; --tomato-a10:#ff6847eb;
+    --page: oklch(15% 0 0); --shell:#000; --container:var(--gray-1); --card:var(--gray-a2); --standout:var(--gray-3);
+    --fg:var(--gray-a12); --fg2:var(--gray-a11); --fg3:var(--gray-a9); --fg4:var(--gray-a8);
+    --line:var(--gray-a3); --line2:var(--gray-a6);
+    --sans:"Inter Variable",-apple-system,sans-serif; --mono:"IoskeleyMono",ui-monospace,Menlo,monospace;
+  }
+  * { box-sizing:border-box } body { margin:0; background:var(--shell); color:var(--fg); font:400 15px/24px var(--sans); font-feature-settings:"ss03"; }
+  code, .mono { font-family:var(--mono); font-size:12px; }
+  .doc { max-width:1180px; margin:0 auto; padding:48px 32px 40px; }
+  h1 { font-size:34px; line-height:40px; letter-spacing:-.8px; margin:0 0 6px } .lead { color:var(--fg2); margin:0 0 36px; font-size:18px; line-height:28px; max-width:820px }
+  h2 { font-size:20px; line-height:24px; letter-spacing:-.3px; margin:44px 0 6px } .sub { color:var(--fg2); margin:0 0 18px }
+  .four { display:grid; grid-template-columns:repeat(4,1fr); gap:14px }
+  .pic { background:var(--container); border:0.5px solid var(--line); border-radius:16px; padding:20px; min-height:220px; display:flex; flex-direction:column; gap:10px }
+  .pic svg { width:100%; height:92px; display:block } .pic b { font-size:15px; display:block } .pic p { margin:0; color:var(--fg2); font-size:13px; line-height:20px }
+  .pic .n { font:500 11px/16px var(--sans); letter-spacing:1px; color:var(--fg3); text-transform:uppercase }
+  table { border-collapse:collapse; width:100%; font-size:13px; line-height:20px } th { text-align:left; color:var(--fg3); font-weight:500; font-size:11px; letter-spacing:1px; text-transform:uppercase; padding:0 14px 8px 0 }
+  td { padding:10px 14px 10px 0; border-top:0.5px solid var(--line); color:var(--fg2); vertical-align:top } td:first-child { color:var(--fg); white-space:nowrap } td code { background:var(--gray-a3); padding:1px 5px; border-radius:4px; color:var(--fg) }
+  .soon { color:var(--fg3) }
+
+  /* ---- the mock ---- */
+  .steps { display:flex; gap:4px; flex-wrap:wrap; margin:0 0 14px }
+  .steps button { font:500 13px/20px var(--sans); color:var(--fg2); background:var(--gray-a2); border:0.5px solid var(--line); border-radius:6px; padding:4px 10px; cursor:pointer }
+  .steps button.on { background:var(--gray-a4); color:var(--fg); border-color:var(--line2) }
+  .steps button:hover { background:var(--gray-a3) }
+  .cap { color:var(--fg2); font-size:13px; line-height:20px; margin:0 0 14px; min-height:20px }
+  .app { background:var(--shell); border:0.5px solid var(--line2); border-radius:12px; overflow:hidden; width:1140px; height:720px; position:relative; font-size:13px; line-height:20px; user-select:none }
+  .bar { height:46px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:0 20px }
+  .brand { display:flex; align-items:center; gap:8px } .brand img { height:22px; display:block }
+  .nav { display:flex; gap:2px } .nav span { padding:3px 10px; border-radius:6px; color:var(--fg2) } .nav span.on { background:var(--gray-a3); color:var(--fg) }
+  .nav .dot { display:inline-block; width:7px; height:7px; border-radius:2px; background:var(--tomato-a10); margin:0 4px 0 6px }
+  .screen { position:absolute; inset:46px 12px 12px; background:var(--container); border-radius:14px; padding:22px 28px 0 }
+  .back { color:var(--fg2); font-size:13px } .ph { display:flex; align-items:flex-end; justify-content:space-between; margin:6px 0 16px; padding-bottom:14px; border-bottom:0.5px solid var(--line) }
+  .ph h3 { margin:0; font-size:22px; line-height:28px; letter-spacing:-.4px } .ph .s { color:var(--fg2); font-size:13px; margin-top:2px } .ph .s code { color:var(--fg2) }
+  .acts { display:flex; gap:8px; align-items:center } .acts .st { color:var(--fg3); font-size:12px; margin-right:6px }
+  .pill { height:28px; padding:0 10px; border-radius:6px; border:0.5px solid var(--line); background:var(--gray-a2); color:var(--fg2); font:500 13px/26px var(--sans) }
+  .pill.primary { background:var(--gray-a4); color:var(--fg) } .pill.sm { height:24px; line-height:22px; font-size:12px } .pill[disabled], .pill.off { color:var(--fg4) }
+  .ws { display:grid; grid-template-columns:1fr 330px; gap:12px; height:552px }
+  .frame { background:var(--gray-2); border:0.5px solid var(--line); border-radius:12px; position:relative; overflow:hidden }
+  .stage-empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:var(--fg3) }
+  .stage-empty .g { display:flex; gap:3px } .stage-empty .g i { width:11px; height:9px; border:1px solid var(--gray-a6); border-radius:2px }
+  .readout { position:absolute; left:14px; top:12px; display:flex; gap:10px; font-size:12px; color:var(--fg2) } .readout b { color:var(--fg); font-weight:500 }
+  .graph { position:absolute; inset:0 } .graph text { font:500 12px var(--sans); fill:var(--fg) } .graph .id { font:11px var(--mono); fill:var(--fg3) } .graph .ev { font:11px var(--mono); fill:var(--fg2) }
+  .graph rect.n { fill:var(--gray-3); stroke:var(--gray-a6); stroke-width:1; rx:8 } .graph rect.wait { stroke:var(--orange-a10) } .graph rect.final { stroke:var(--green-9) }
+  .graph path { fill:none; stroke:var(--gray-a8); stroke-width:1.2 } .graph .arr { fill:var(--gray-a8) }
+  .insp { display:flex; flex-direction:column }
+  .talk { flex:1; overflow:hidden; padding:16px 16px 12px; display:flex; flex-direction:column; gap:12px }
+  .intro { margin-top:auto; display:flex; flex-direction:column; gap:8px; padding:4px } .intro .h { font-weight:500; font-size:15px } .intro p { margin:0; color:var(--fg2) } .intro a { color:var(--fg2); text-decoration:none }
+  .card { border:0.5px solid var(--line2); border-radius:10px; background:var(--gray-a2); padding:14px } .card .h { font-weight:500; font-size:15px; margin-bottom:2px } .card p { margin:0 0 10px; color:var(--fg2) }
+  .tiles { display:grid; grid-template-columns:1fr 1fr; gap:6px } .tile { display:flex; align-items:center; gap:8px; padding:8px 10px; border:0.5px solid var(--line); border-radius:8px; background:var(--gray-a2); cursor:pointer; font-weight:500 } .tile:hover { background:var(--gray-a3) } .tile.soon { color:var(--fg3); font-weight:400 } .tile.soon small { color:var(--fg4); margin-left:auto; font-size:11px }
+  .ico { width:16px; height:16px; border-radius:4px; display:inline-block; flex:none } .ico.cc { background:#d97757 } .ico.pi { background:#8b5cf6 } .ico.oc { background:#fff } .ico.mcp { background:var(--gray-6) }
+  .lines { display:flex; flex-direction:column; gap:6px; margin:8px 0 10px } .ln { display:flex; align-items:center; gap:8px; background:var(--gray-1); border:0.5px solid var(--line); border-radius:6px; padding:6px 8px } .ln code { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--fg) } .ln .k { color:var(--fg3); font-size:11px; width:14px } .ln .cp { color:var(--fg3); font-size:11px; cursor:pointer }
+  .wait { display:flex; align-items:center; gap:8px; color:var(--fg2) } .pulse { width:8px; height:8px; border-radius:50%; background:var(--blue-a10); animation:pulse 1.4s ease-in-out infinite } @keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:1} }
+  .status { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; background:var(--gray-a2); border:0.5px solid var(--line) } .status .d { width:7px; height:7px; border-radius:50%; background:var(--green-11); flex:none } .status.dim .d { background:var(--gray-a8) } .status .w { color:var(--fg2) } .status code { color:var(--fg2) } .status .r { margin-left:auto; color:var(--fg3); font-size:11px }
+  .msg.you { display:flex; gap:8px } .msg .actor { color:var(--fg3); flex:none } .msg p { margin:0 } .msg.agent p { margin:0; color:var(--fg2) }
+  .tool { display:flex; align-items:center; gap:8px; color:var(--fg2); font-size:12px } .tool .b { width:9px; height:9px; border-radius:2px; border:1px solid var(--gray-a8); flex:none } .tool.ok .b { background:var(--green-9); border-color:var(--green-9) } .tool.pend .b { border-color:var(--blue-a10) }
+  .queued { display:flex; align-items:center; gap:8px; color:var(--fg3); font-size:12px }
+  .composer { padding:12px; border-top:0.5px solid var(--line); display:flex; flex-direction:column; gap:8px } .ta { min-height:80px; border:0.5px solid var(--line); border-radius:6px; background:var(--gray-a3); padding:4px 8px; color:var(--fg4) } .ta.on { color:var(--fg) } .ta.off { background:var(--gray-a2) }
+  .row { display:flex; align-items:center; justify-content:space-between } .picks { display:flex; gap:2px; align-items:center; position:relative }
+  .pick { display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 10px 0 8px; border-radius:6px; color:var(--fg2); font-weight:500 } .pick .car { width:10px; height:10px; display:inline-block; border-right:1.4px solid currentColor; border-bottom:1.4px solid currentColor; transform:translateY(-2px) rotate(45deg) scale(.6) } .pick .d { width:7px; height:7px; border-radius:50%; background:var(--green-11) } .pick .d.off { background:var(--gray-a8) }
+  .pick.busy .ico { animation:pulse 1.4s ease-in-out infinite }
+  .menu { position:absolute; left:0; bottom:32px; width:330px; background:oklch(25.2% 0 0); border:0.5px solid var(--line2); border-radius:8px; padding:4px; box-shadow:0 8px 24px #0008; z-index:2 }
+  .menu .it { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; white-space:nowrap } .menu .it.on { background:var(--gray-a3) } .menu .it .nm { font-weight:500 } .menu .it .dim { color:var(--fg3); font-size:11px; margin-left:auto } .menu .it code { color:var(--fg2) } .menu .sep { height:0.5px; background:var(--line); margin:4px 6px } .menu .it.start { color:var(--fg2) }
+  .probs { padding:10px 16px; border-top:0.5px solid var(--line); color:var(--fg3); font-size:12px } .probs.ok { color:var(--fg2) }
+  [hidden] { display:none !important }
+</style></head><body>
+<div class="doc">
+  <h1>Connect your agent</h1>
+  <p class="lead">Your own agent, in the terminal it already runs in, with your login and your repo, draws the machine in the designer. Nothing runs on our server, so it works the same locally and hosted.</p>
+
+  <h2>How it works</h2>
+  <p class="sub">Four pictures. The pattern is the one the Plannotator Inbox uses for the same three hosts.</p>
+  <div class="four">
+    <div class="pic"><span class="n">1 · once, in the terminal</span>
+      <svg viewBox="0 0 240 92"><rect x="8" y="8" width="224" height="76" rx="8" fill="#0d0d0d" stroke="#333"/><text x="20" y="34" font-family="IoskeleyMono,monospace" font-size="11" fill="#9fd3ff">$ machine login https://app… mk_…</text><text x="20" y="54" font-family="IoskeleyMono,monospace" font-size="11" fill="#9fd3ff">$ pi install npm:@backnotprop/pi-machine</text><text x="20" y="74" font-family="IoskeleyMono,monospace" font-size="11" fill="#777">$ pi</text></svg>
+      <b>Sign in, install the plugin, start the agent</b><p>Two lines for the computer, once. Then the agent is started in the repo the machine is about.</p></div>
+    <div class="pic"><span class="n">2 · the designer sees it</span>
+      <svg viewBox="0 0 240 92"><rect x="8" y="22" width="224" height="46" rx="8" fill="#1a1a1a" stroke="#333"/><circle cx="28" cy="45" r="5" fill="#3dd68c"/><text x="42" y="41" font-family="Inter Variable,sans-serif" font-size="12" fill="#eee" font-weight="500">Claude Code</text><text x="42" y="57" font-family="IoskeleyMono,monospace" font-size="10" fill="#999">~/code/acme · connected</text></svg>
+      <b>The plugin polls, the designer shows the session</b><p>The plugin long-polls our server with the login's key. The first poll is the handshake: host, folder, session.</p></div>
+    <div class="pic"><span class="n">3 · you type, the agent hears it</span>
+      <svg viewBox="0 0 240 92"><rect x="8" y="8" width="100" height="36" rx="8" fill="#1a1a1a" stroke="#333"/><text x="18" y="30" font-family="Inter Variable,sans-serif" font-size="11" fill="#eee">designer</text><rect x="132" y="48" width="100" height="36" rx="8" fill="#0d0d0d" stroke="#333"/><text x="142" y="70" font-family="IoskeleyMono,monospace" font-size="11" fill="#9fd3ff">&gt; agent turn</text><path d="M108 26 H120 V66 H132" fill="none" stroke="#888" stroke-width="1.5"/><path d="M128 62 L134 66 L128 70 Z" fill="#888"/></svg>
+      <b>The message becomes a turn in that session</b><p>Held on the server until the agent is idle, then entered as a turn, once. Nothing interrupts what it is doing.</p></div>
+    <div class="pic"><span class="n">4 · it draws</span>
+      <svg viewBox="0 0 240 92"><g font-family="Inter Variable,sans-serif" font-size="10" fill="#eee"><rect x="10" y="30" width="56" height="28" rx="6" fill="#222" stroke="#444"/><text x="18" y="48">triage</text><rect x="92" y="30" width="56" height="28" rx="6" fill="#222" stroke="#444"/><text x="104" y="48">build</text><rect x="174" y="30" width="56" height="28" rx6="6" rx="6" fill="#222" stroke="#30a46c"/><text x="190" y="48">ship</text></g><path d="M66 44 H92 M148 44 H174" stroke="#888" stroke-width="1.5"/><path d="M88 40 L94 44 L88 48 Z M170 40 L176 44 L170 48 Z" fill="#888"/></svg>
+      <b>The agent calls <code>draft</code>, the graph redraws</b><p>The plugin's one tool proxies to our MCP: draft, get_draft, say. The server checks each draft and the stage follows it, exactly as today.</p></div>
+  </div>
+
+  <h2>The three hosts</h2>
+  <p class="sub">Each one has a native plugin API, so the connection is a real plugin, not a prompt trick. Other agents get the tool over plain MCP today and a wake once the MCP Events spec lands.</p>
+  <table>
+    <tr><th>Host</th><th>Install</th><th>Register the tool</th><th>Enter a message as a turn</th></tr>
+    <tr><td>Claude Code</td><td><code>/plugin marketplace add backnotprop/machine</code> · <code>/plugin install machine@machine</code></td><td>hooks module, <code>$.tool.register</code></td><td><code>$.prompt.submit</code> when idle; <code>$.session.append</code> into a running turn</td></tr>
+    <tr><td>Pi</td><td><code>pi install npm:@backnotprop/pi-machine</code></td><td><code>pi.registerTool</code>, active on first interactive session</td><td><code>pi.sendUserMessage(text, { deliverAs: "followUp" })</code> once <code>ctx.isIdle()</code></td></tr>
+    <tr><td>OpenCode 2</td><td><code>"plugin": ["@backnotprop/opencode-machine"]</code> in opencode.json</td><td><code>tool()</code></td><td><code>session.prompt({ delivery: "queue" })</code> once idle</td></tr>
+    <tr class="soon"><td>Other agents (MCP)</td><td><code>claude mcp add</code>-style, the machine MCP</td><td>the tools work today</td><td>no wake until MCP Events lands · soon</td></tr>
+  </table>
+
+  <h2>The designer, step by step</h2>
+  <p class="sub">Click the steps, or the things in the screen. Everything outside the connection (graph, tool rows, hand edits, Publish) is the screen as it is today.</p>
+  <div class="steps" id="steps"></div>
+  <p class="cap" id="cap"></p>
+
+  <div class="app" id="app">
+    <div class="bar"><div class="brand"><img src="file:///Users/ramos/oss/machine/docs/brand/final/gt-badge.svg" alt="machine"></div><div class="nav"><span>Runs<i class="dot"></i>1</span><span class="on">Machines</span><span>Credentials</span></div><div></div></div>
+    <div class="screen">
+      <div class="back">‹ Machines</div>
+      <div class="ph">
+        <div><h3 id="title">New machine</h3><div class="s" id="sub">Say what the process is. Your agent drafts it and you watch it take shape.</div></div>
+        <div class="acts"><span class="st" data-on="5">Nothing to fix</span><span class="pill off" data-on="1 2 3 7">Open in editor</span><span class="pill" data-on="4 5 6">Open in editor</span><span class="pill primary off" data-on="1 2 3 4 7">Publish</span><span class="pill primary" data-on="5 6">Publish</span></div>
+      </div>
+      <div class="ws">
+        <section class="frame">
+          <div class="stage-empty" data-on="1 2 3 7"><div class="g"><i></i><i></i><i></i><i></i><i></i></div><span>Describe the process and watch it take shape</span></div>
+          <div data-on="4 5 6">
+            <div class="readout"><b>Ship a fix</b><span>5 states</span></div>
+            <svg class="graph" viewBox="0 0 760 552">
+              <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" class="arr"/></marker></defs>
+              <g><rect class="n" x="40" y="250" width="130" height="52"/><text x="56" y="272">Triage the issue</text><text class="id" x="56" y="290">triage</text></g>
+              <g><rect class="n" x="220" y="250" width="130" height="52"/><text x="236" y="272">Implement the fix</text><text class="id" x="236" y="290">build</text></g>
+              <g><rect class="n" x="400" y="250" width="130" height="52"/><text x="416" y="272">Run the tests</text><text class="id" x="416" y="290">verify</text></g>
+              <g><rect class="n wait" x="580" y="250" width="130" height="52"/><text x="596" y="272">Wait for review</text><text class="id" x="596" y="290">review · wait</text></g>
+              <g><rect class="n final" x="580" y="390" width="130" height="52"/><text x="596" y="412">Merged</text><text class="id" x="596" y="430">ship · final</text></g>
+              <path d="M170 276 H220" marker-end="url(#a)"/><text class="ev" x="176" y="268">triaged</text>
+              <path d="M350 276 H400" marker-end="url(#a)"/><text class="ev" x="358" y="268">fixed</text>
+              <path d="M530 276 H580" marker-end="url(#a)"/><text class="ev" x="542" y="268">pass</text>
+              <path d="M465 250 C465 200 285 200 285 250" marker-end="url(#a)"/><text class="ev" x="358" y="208">fail</text>
+              <path d="M645 302 V390" marker-end="url(#a)"/><text class="ev" x="652" y="350">approved</text>
+              <path d="M645 302 C645 360 285 360 285 302" marker-end="url(#a)"/><text class="ev" x="400" y="352">changes_requested</text>
+            </svg>
+          </div>
+        </section>
+        <aside class="frame insp">
+          <div class="talk">
+            <div class="intro" data-on="1 2 3">
+              <div class="card" data-on="1"><div class="h">Connect your agent</div><p>The agent you already use draws the machine here, from your own terminal and repo.</p>
+                <div class="tiles"><div class="tile" onclick="go(2)"><i class="ico cc"></i>Claude Code</div><div class="tile" onclick="go(2)"><i class="ico pi"></i>Pi</div><div class="tile" onclick="go(2)"><i class="ico oc"></i>OpenCode</div><div class="tile soon"><i class="ico mcp"></i>Other (MCP)<small>soon</small></div></div></div>
+              <div class="card" data-on="2"><div class="h"><i class="ico cc" style="vertical-align:-3px;margin-right:6px"></i>Claude Code</div><p>Once per computer, in a terminal:</p>
+                <div class="lines"><div class="ln"><span class="k">1</span><code>machine login http://localhost:7420</code><span class="cp">copy</span></div><div class="ln"><span class="k">2</span><code>/plugin marketplace add backnotprop/machine</code><span class="cp">copy</span></div><div class="ln"><span class="k">3</span><code>/plugin install machine@machine</code><span class="cp">copy</span></div></div>
+                <p>Then start <code>claude</code> in the repo this machine is about.</p>
+                <div class="wait" onclick="go(3)"><i class="pulse"></i>Waiting for Claude Code…</div></div>
+              <div class="status" data-on="3"><i class="d"></i><b>Claude Code</b><code>~/code/acme</code><span class="w">connected</span><span class="r">just now</span></div>
+              <div data-on="3"><div class="h" style="font-weight:500;font-size:15px;margin-top:6px">What should the agent do?</div><p>Name the steps in plain words, where a person decides, and how it ends. You can also just say it in the terminal: the same session draws here.</p><a href="#">Or draw it yourself</a></div>
+            </div>
+            <div class="msg you" data-on="4 5 6 7"><span class="actor">You</span><p>Triage the issue, implement the fix, run the tests, then a person reviews. Changes requested goes back to the fix. Merged is the end.</p></div>
+            <div class="tool pend" data-on="4"><i class="b"></i><span>Drafting…</span></div>
+            <div class="tool ok" data-on="5 6"><i class="b"></i><span>Drafted · 5 states · clean</span></div>
+            <div class="msg agent" data-on="5 6"><p>Drew it: triage, build, verify, a wait for review, merged. Failing tests go back to build. Say if the review should also be able to abandon it.</p></div>
+            <div class="tool ok" data-on="7" style="margin-top:auto"><i class="b"></i><span>Drafted · 5 states · clean</span></div>
+            <div class="msg you" data-on="7"><span class="actor">You</span><p>Add a state before ship that deploys to staging.</p></div>
+            <div class="queued" data-on="7"><i class="pulse"></i>Waiting for Claude Code to pick it up · it last checked in 3 min ago</div>
+          </div>
+          <div class="composer">
+            <div class="ta off" data-on="1 2">Connect an agent to describe the process</div>
+            <div class="ta" data-on="3">Describe the process</div>
+            <div class="ta" data-on="4 5 6 7">Ask for a change</div>
+            <div class="row">
+              <div class="picks">
+                <span class="pick" data-on="1"><i class="ico mcp"></i>Connect your agent<i class="car"></i></span>
+                <span class="pick" data-on="2"><i class="ico cc"></i>Claude Code<span style="color:var(--fg3)">waiting</span><i class="car"></i></span>
+                <span class="pick" data-on="3 5 6" onclick="go(6)"><i class="ico cc"></i>Claude Code<i class="d"></i><code style="color:var(--fg3)">~/code/acme</code><i class="car"></i></span>
+                <span class="pick busy" data-on="4"><i class="ico cc"></i>Claude Code is drawing</span>
+                <span class="pick" data-on="7"><i class="ico cc"></i>Claude Code<i class="d off"></i><span style="color:var(--fg3)">last seen 3 min ago</span><i class="car"></i></span>
+                <div class="menu" data-on="6" onclick="go(5)">
+                  <div class="it on"><i class="ico cc"></i><span class="nm">Claude Code</span><code>~/code/acme</code><span class="dim">connected</span></div>
+                  <div class="it"><i class="ico pi"></i><span class="nm">Pi</span><code>~/notes</code><span class="dim">connected</span></div>
+                  <div class="it"><i class="ico cc"></i><span class="nm">Claude Code</span><code>~/code/web</code><span class="dim">4 min ago</span></div>
+                  <div class="sep"></div>
+                  <div class="it start"><i class="ico mcp"></i><span class="nm">Connect another agent…</span></div>
+                  <div class="it start"><i class="ico cc"></i><span class="nm">Start Claude Code here</span><span class="dim">local only</span></div>
+                </div>
+              </div>
+              <span class="pill sm off" data-on="1 2 3 7">Send</span><span class="pill sm primary" data-on="5 6">Send</span><span class="pill sm" data-on="4">Working in your terminal</span>
+            </div>
+          </div>
+          <div class="probs" data-on="1 2 3 4 7">The draft's problems show here.</div>
+          <div class="probs ok" data-on="5 6">Nothing to fix. Publish when ready.</div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const STEPS = [
+    [1, "No agent yet", "First visit. The chat offers the three hosts; the composer waits for a connection."],
+    [2, "Pick Claude Code", "The lines to run, once per computer. The designer waits for the plugin's first poll."],
+    [3, "Connected", "The plugin polled: host, folder, session. Green dot, composer live. The person can type here or in the terminal."],
+    [4, "Drawing", "The message entered the agent's session as a turn. The tool row is pending until the first draft lands."],
+    [5, "Done", "Draft checked clean, graph drawn, the agent's note beside it. Publish is live. Nothing here is new."],
+    [6, "Two sessions", "The pick lists every connected session with its folder, plus connecting another, and the local-only ACP start."],
+    [7, "Agent away", "The terminal is closed or busy elsewhere: the status dims and the message waits for the next poll. Nothing is lost."],
+  ];
+  const app = document.getElementById("app"), steps = document.getElementById("steps"), cap = document.getElementById("cap");
+  for (const [n, name] of STEPS) { const b = document.createElement("button"); b.textContent = `${n} · ${name}`; b.onclick = () => go(n); steps.append(b); }
+  function go(n) {
+    for (const el of app.querySelectorAll("[data-on]")) el.hidden = !el.dataset.on.split(" ").includes(String(n));
+    [...steps.children].forEach((b, i) => b.classList.toggle("on", i + 1 === n));
+    cap.textContent = STEPS[n - 1][2];
+    document.getElementById("title").textContent = n >= 4 ? "Ship a fix" : "New machine";
+    document.getElementById("sub").innerHTML = n >= 4 ? "<code>ship-fix</code> · 5 states · draft" : "Say what the process is. Your agent drafts it and you watch it take shape.";
+    location.hash = "s" + n;
+  }
+  window.go = go;
+  go(Number((location.hash.match(/s(\d)/) || [])[1]) || 1);
+</script>
+</body></html>

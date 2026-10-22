@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.machine-home/
+machine.db*
+evals/last-*.json
+.env
+*.log
+.DS_Store
+# launch film: renders and generated audio (sources film.html, mix.ts, music.ts, render.mjs stay)
+film/out/
+film/audio/
+# the video workshop: 1.7 GB of frames, cuts and the ElevenLabs .env; sources live in film/
+video/
+# third-party design-system mirror and its screenshots (reference only, not ours to publish)
+docs/design/interfere/
+docs/design/shots-interfere/

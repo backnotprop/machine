@@ -1,0 +1,13 @@
+{
+  "name": "changelog-unblocked",
+  "machine": "examples/changelog-draft.machine.json",
+  "inputs": { "repo_path": "$FIXTURE", "version": "0.2.0" },
+  "setup": "git init -q && git config user.email a@b.c && git config user.name t && echo '# demo' > README.md && git add -A && git commit -qm 'Initial project scaffold' && git tag v0.1.0 && echo 'export const sub=(a,b)=>a-b' > math.js && git add -A && git commit -qm 'Add sub() to math helper' && echo 'export const div=(a,b)=>b===0?NaN:a/b' > div.js && git add -A && git commit -qm 'Fix divide by zero in div()'",
+  "expect": { "status": "blocked", "state": "collect", "max_rejected": 0 },
+  "then": {
+    "setup": "echo 'Dana Q.' > .changelog-author",
+    "note": "Added .changelog-author for you. One change: head the section `## 0.2.0 (hotfix)` instead of `## 0.2.0`, and put only the divide-by-zero fix in it, under Fixed. Leave sub() out.",
+    "expect": { "status": "succeeded", "state": "ready", "max_rejected": 0, "file_exists": ["CHANGELOG.md"] }
+  },
+  "judge": { "question": "Does CHANGELOG.md have a section headed exactly '## 0.2.0 (hotfix)', containing a single bullet about the divide-by-zero fix under a 'Fixed' heading, no bullet about sub(), and a 'Prepared by: Dana Q.' line?", "files": ["CHANGELOG.md"] }
+}

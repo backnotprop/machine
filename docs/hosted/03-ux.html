@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>machine · hosted · screens</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* ============ tokens: copied from src/ui/styles.css ============ */
+:root {
+  --color-page: #08080a; --color-stage: #0e0e11; --color-raise: #15151a; --color-raise-2: #1c1c22; --color-raise-3: #25252c;
+  --color-field-focus: #202027; --color-hair: #ffffff0d;
+  --color-ink: #ededef; --color-ink-2: #a3a3ad; --color-ink-3: #85858f; --color-ink-4: #4a4a53; --color-on-light: #0a0a0c;
+  --color-graphite-lo: #2e2e35; --color-graphite: #3a3a42; --color-graphite-hi: #55555e;
+  --color-blue: #3b82f6; --color-blue-hi: #93c2ff; --color-red: #ff5d62; --color-red-hi: #ffa3a5;
+  --color-amber: #f2b45a; --color-amber-hi: #ffd9a1; --color-done: #e9e9ee; --color-done-hi: #ffffff;
+  --color-failed: #b8494d; --color-failed-hi: #d77a7d;
+  --g-node: #17171c; --g-node-final: #121216; --g-node-walked: #22222a; --g-stroke: #2a2a31; --g-stroke-walked: #4a4a54;
+  --g-edge: #45454e; --g-edge-walked: #7d7d88; --dash-sm: 2.5 2; --dash-lg: 5 4;
+  --font-sans: "Geist", "Geist Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --t-xs: 12px; --t-sm: 13px; --t-md: 14.5px; --t-lg: 18px; --t-xl: 30px; --t-mono: 12px; --t-mono-sm: 11px;
+  --r-frame: 30px; --r-card: 22px; --r-item: 16px; --r-field: 12px; --r-chip: 7px; --r-ctl: 999px;
+  --ease: cubic-bezier(.22, 1, .36, 1); --d-1: .15s; --d-2: .32s; --d-3: .7s;
+  --ring: 0 0 0 1px color-mix(in srgb, var(--color-ink-2) 55%, transparent), 0 0 0 4px color-mix(in srgb, var(--color-ink-2) 14%, transparent);
+  --maxw: 1680px; --gutter: 40px; --row-px: 22px;
+  --tone: var(--color-ink-3); --tone-hi: var(--color-ink-2);
+}
+[data-tone="running"], .t-running { --tone: var(--color-blue); --tone-hi: var(--color-blue-hi); }
+[data-tone="waiting"], .t-waiting { --tone: var(--color-amber); --tone-hi: var(--color-amber-hi); }
+[data-tone="blocked"], .t-blocked { --tone: var(--color-red); --tone-hi: var(--color-red-hi); }
+[data-tone="succeeded"], .t-succeeded { --tone: var(--color-done); --tone-hi: var(--color-done-hi); }
+[data-tone="failed"], .t-failed { --tone: var(--color-failed); --tone-hi: var(--color-failed-hi); }
+[data-tone="cancelled"], .t-cancelled { --tone: var(--color-ink-4); --tone-hi: var(--color-ink-3); }
+.t-check { --tone: var(--color-graphite-hi); --tone-hi: var(--color-ink-3); }
+.t-none { --tone: var(--color-graphite); --tone-hi: var(--color-graphite-hi); }
+
+/* ============ reset ============ */
+*, *::before, *::after { box-sizing: border-box; }
+html { background: #000; color-scheme: dark; }
+body { margin: 0; color: var(--color-ink); font: var(--t-md)/1.55 var(--font-sans); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p, ol, ul, dl, dd, pre { margin: 0; }
+h1, h2, h3 { font-size: inherit; font-weight: inherit; }
+ol, ul { padding: 0; list-style: none; }
+svg { display: block; }
+a { color: inherit; text-decoration: none; }
+button, input, textarea { font: inherit; color: inherit; background: none; border: 0; margin: 0; }
+button { padding: 0; cursor: pointer; text-align: inherit; }
+textarea { resize: none; }
+code, .mono { font-family: var(--font-mono); font-size: var(--t-mono); }
+.dim { color: var(--color-ink-3); }
+.sep { display: inline-block; width: 3px; height: 3px; border-radius: 1px; background: var(--color-ink-4); margin: 0 8px; vertical-align: middle; flex: none; }
+
+/* ============ mock chrome (not part of the product) ============ */
+.chrome { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 4px; width: 1440px; margin: 0 auto; padding: 10px 12px; background: #000; font: 500 var(--t-mono-sm) var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--color-ink-3); }
+.chrome .t { padding: 6px 12px; border-radius: var(--r-chip); transition: color var(--d-1) var(--ease), background var(--d-1) var(--ease); }
+.chrome .t:hover { color: var(--color-ink); }
+.chrome .t.on { color: var(--color-ink); background: var(--color-raise-2); }
+.chrome .note { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.mock { display: none; width: 1440px; margin: 0 auto; min-height: 900px; background: var(--color-page); }
+.mock.on { display: block; }
+
+/* ============ shell ============ */
+.bar { position: relative; z-index: 20; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 64px;
+  padding: 0 calc(var(--gutter) + max(0px, (100% - 2 * var(--gutter) - var(--maxw)) / 2)); background: color-mix(in srgb, var(--color-page) 97%, transparent); }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; letter-spacing: -0.015em; justify-self: start; }
+.bar-r { justify-self: end; display: flex; align-items: center; gap: 14px; font-size: var(--t-xs); position: relative; }
+.need { display: inline-flex; align-items: center; gap: 5px; font: 500 var(--t-mono) var(--font-mono); color: var(--color-ink); }
+.need + .need { margin-left: 4px; }
+.screen { padding: 8px var(--gutter) 96px; }
+.page { max-width: var(--maxw); margin: 0 auto; }
+header.top { padding: 20px 0 28px; }
+header.top .back { display: inline-flex; align-items: center; gap: 4px; margin: 0 0 14px -4px; padding: 0 4px; color: var(--color-ink-3); font-size: var(--t-sm); }
+.head-row { display: flex; align-items: last baseline; justify-content: space-between; gap: 24px; }
+header.top h1 { font-size: var(--t-xl); line-height: 1.15; font-weight: 600; letter-spacing: -0.03em; }
+header.top .sub { margin-top: 8px; color: var(--color-ink-2); font-size: var(--t-md); display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; }
+header.top .sub code { color: var(--color-ink); }
+.actions { display: flex; gap: 8px; align-items: center; flex: none; }
+.status { display: inline-flex; align-items: center; gap: 8px; color: var(--color-ink-2); font-size: var(--t-sm); }
+
+/* ============ controls ============ */
+.pill { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 20px; border-radius: var(--r-ctl); background: var(--color-raise-2); color: var(--color-ink); font-size: var(--t-sm); font-weight: 500; white-space: nowrap; flex: none; transition: background var(--d-1) var(--ease), transform var(--d-1) var(--ease); }
+.pill.sm { height: 32px; padding: 0 14px; font-size: var(--t-xs); }
+.pill:hover { background: var(--color-raise-3); }
+.pill:active { transform: scale(.97); }
+.pill.primary { background: var(--color-ink); color: var(--color-on-light); }
+.pill.primary:hover { background: var(--color-done-hi); }
+.pill.quiet { background: transparent; color: var(--color-ink-2); }
+.pill.quiet:hover { background: var(--color-raise); color: var(--color-ink); }
+.pill.ghost { background: color-mix(in srgb, var(--color-raise-2) 85%, transparent); color: var(--color-ink-2); }
+.pill[disabled] { opacity: .45; cursor: default; }
+.pill.primary[disabled] { background: var(--color-raise-2); color: var(--color-ink-2); opacity: 1; }
+.switch { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-ctl); background: color-mix(in srgb, var(--color-stage) 90%, transparent); }
+.switch > a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 30px; padding: 0 16px; border-radius: var(--r-ctl); color: var(--color-ink-3); font-size: var(--t-sm); font-weight: 500; white-space: nowrap; }
+.switch > a:hover { color: var(--color-ink); }
+.switch > .on { background: var(--color-raise-3); color: var(--color-ink); }
+.bar .switch > a { min-width: 128px; }
+.link { color: var(--color-ink-3); font-size: var(--t-xs); font-weight: 500; }
+.link:hover { color: var(--color-ink); }
+.chev { width: 12px; height: 12px; }
+
+/* the team menu: switcher and account in one place */
+.team-pill .chev { color: var(--color-ink-3); }
+.bar-l { display: flex; align-items: center; gap: 14px; justify-self: start; position: relative; }
+.bar-l .menu { right: auto; left: 118px; }
+.menu { position: absolute; top: 40px; right: 0; z-index: 30; min-width: 260px; padding: 6px; border-radius: var(--r-item); background: var(--color-raise-2); box-shadow: 0 12px 32px #0008; display: flex; flex-direction: column; gap: 2px; }
+.menu a, .menu span { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: var(--r-field); font-size: var(--t-sm); color: var(--color-ink); }
+.menu a:hover { background: var(--color-raise-3); }
+.menu .on { background: var(--color-raise-3); }
+.menu a .block { margin-left: auto; }
+.menu span { color: var(--color-ink-3); font-size: var(--t-xs); height: 30px; }
+.menu hr { border: 0; height: 1px; margin: 4px 6px; background: var(--color-hair); }
+
+/* ============ text pieces ============ */
+.label { display: block; color: var(--color-ink-3); font-size: var(--t-xs); font-weight: 500; }
+.label code { font-size: var(--t-mono-sm); }
+.section-h { font-size: var(--t-lg); font-weight: 600; letter-spacing: -0.015em; line-height: 1.3; }
+.quiet { color: var(--color-ink-3); font-size: var(--t-sm); }
+.quote { color: var(--color-ink); quotes: none; }
+.quote::before { content: "“"; color: var(--color-ink-3); } .quote::after { content: "”"; color: var(--color-ink-3); }
+.count { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: var(--r-chip); background: var(--color-raise-3); color: var(--color-ink-2); font: 500 var(--t-mono-sm) var(--font-mono); }
+.readout, .kind { font: 500 var(--t-mono-sm)/1 var(--font-mono); color: var(--color-ink-2); }
+.kind { letter-spacing: .06em; text-transform: uppercase; margin-bottom: 10px; }
+.readout { position: absolute; z-index: 4; top: 29px; left: 30px; display: flex; align-items: center; gap: 10px; }
+.readout .rs { color: var(--tone-hi); letter-spacing: .06em; text-transform: uppercase; }
+.readout .ra { color: var(--color-ink-2); } .readout .rt { color: var(--color-ink-3); }
+.hint { color: var(--color-ink-3); font-size: var(--t-xs); }
+.clamp p { color: var(--color-ink-2); white-space: pre-wrap; }
+.clamp .link { margin-top: 4px; display: inline-block; }
+.arrow { color: var(--color-ink-3); }
+
+/* ============ the status language ============ */
+.block { display: inline-block; flex: none; vertical-align: middle; }
+.block { color: var(--tone); }
+.block.hollow rect { fill: none; stroke: var(--color-ink-3); stroke-width: 1.3; }
+.glyph { overflow: visible; }
+.glyph .w { fill: var(--color-graphite); }
+.glyph .a { fill: none; stroke: var(--color-graphite); stroke-width: 1; }
+.glyph .more { fill: var(--color-ink-4); }
+.glyph .lit { fill: var(--tone); }
+.glyph.t-blocked .lit { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tone) 70%, transparent)); }
+.glyph.t-succeeded .w, .glyph.t-failed .w, .glyph.t-cancelled .w { fill: var(--color-graphite-lo); }
+.glyph.wait .a { stroke: var(--color-graphite-hi); }
+.amark { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 14px; height: 14px; color: var(--color-ink-2); }
+.amark svg { width: 100%; height: 100%; }
+.amark.tile { width: 30px; height: 30px; border-radius: var(--r-chip); background: var(--color-raise-2); }
+.amark.tile svg { width: 18px; height: 18px; }
+.agent-inline { color: var(--color-ink); white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+
+/* ============ rows ============ */
+.group { margin-top: 8px; } .group + .group { margin-top: 32px; }
+.eyebrow { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px var(--row-px); }
+.eyebrow .n { font: var(--t-mono-sm) var(--font-mono); color: var(--color-ink-3); }
+.rows { display: flex; flex-direction: column; gap: 2px; }
+.row { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; align-items: center; gap: 28px; padding: 15px var(--row-px); border-radius: var(--r-card); position: relative; transition: background var(--d-1) var(--ease); }
+.row:hover, .row.sel { background: var(--color-raise); }
+.row.plain { grid-template-columns: minmax(0, 1fr) auto; }
+.r-glyph { display: flex; align-items: center; min-width: 0; }
+.r-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.r-title { font-size: var(--t-md); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.r-sub { display: flex; align-items: center; color: var(--color-ink-2); font-size: var(--t-sm); white-space: nowrap; overflow: hidden; }
+.r-sub code { color: var(--color-ink); margin-left: 4px; }
+.r-sub a:hover { color: var(--color-ink); }
+.r-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; }
+.r-time { color: var(--color-ink-3); font-size: var(--t-sm); white-space: nowrap; }
+.r-agent { display: inline-flex; align-items: center; gap: 6px; color: var(--color-ink-3); font-size: var(--t-xs); white-space: nowrap; }
+.r-agent .sep { margin: 0 6px; }
+.r-links { display: inline-flex; gap: 14px; align-items: center; }
+.r-role { color: var(--color-ink-3); font-size: var(--t-sm); }
+.row.big { background: var(--color-stage); padding-top: 24px; padding-bottom: 24px; align-items: start; overflow: hidden; }
+.row.big::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .8; background: radial-gradient(120% 140% at 0% 50%, color-mix(in srgb, var(--tone) 15%, transparent), transparent 46%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 16%, transparent); }
+.row.big + .row.big { margin-top: 10px; }
+.row.big .r-glyph { padding-top: 5px; }
+.row.big .r-title { font-size: var(--t-lg); letter-spacing: -0.015em; }
+.r-ask { margin-top: 10px; color: var(--color-ink); font-size: var(--t-md); line-height: 1.5; white-space: normal; max-width: 70ch; }
+.r-ask code { color: var(--color-ink); }
+.row.big .r-side .pill { margin-top: 10px; }
+.r-stat { display: flex; align-items: center; justify-content: flex-end; }
+.empty { margin: 24px 0 0; max-width: 560px; padding: 44px 48px 48px; border-radius: var(--r-card); background: var(--color-stage); color: var(--color-ink-2); display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.empty .e-t { color: var(--color-ink); font-size: var(--t-lg); font-weight: 500; }
+.empty code { color: var(--color-ink); }
+
+/* ============ fields ============ */
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field input, .field textarea, .answer textarea { width: 100%; border: 0; outline: none; border-radius: var(--r-field); background: var(--color-raise-2); color: var(--color-ink); padding: 9px 12px; font: var(--t-mono)/1.55 var(--font-mono); }
+.field input.prose { font: var(--t-sm)/1.55 var(--font-sans); }
+.field input::placeholder, .answer textarea::placeholder { color: var(--color-ink-3); }
+.answer textarea { min-height: 64px; padding: 14px 16px; font: var(--t-md)/1.55 var(--font-sans); border-radius: var(--r-item); }
+.inline-form { display: flex; align-items: flex-end; gap: 10px; }
+.inline-form .field { flex: 1; }
+.inline-form .field.narrow { flex: 0 0 260px; }
+.form-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+
+/* ============ team and credentials sections ============ */
+.sections { display: flex; flex-direction: column; gap: 44px; max-width: 1100px; }
+.sec-h { display: flex; align-items: baseline; gap: 14px; margin: 0 0 14px var(--row-px); }
+.ctx { color: var(--color-ink-2); font-size: var(--t-sm); margin: 0 0 14px var(--row-px); max-width: 70ch; }
+.ctx code { color: var(--color-ink); }
+.once { margin: 0 0 10px; padding: 24px 28px; border-radius: var(--r-card); background: var(--color-raise); display: flex; flex-direction: column; gap: 12px; }
+.once .key { font: 500 var(--t-mono) var(--font-mono); color: var(--color-ink); padding: 12px 14px; border-radius: var(--r-field); background: var(--color-stage); white-space: pre-wrap; overflow-wrap: anywhere; }
+.once .cmd { font: var(--t-mono) var(--font-mono); color: var(--color-ink-2); padding: 12px 14px; border-radius: var(--r-field); background: var(--color-stage); white-space: pre-wrap; overflow-wrap: anywhere; }
+.once .cmd b { font-weight: 400; color: var(--color-ink); }
+.paste { margin: 0 0 24px; padding: 24px 28px; border-radius: var(--r-card); background: var(--color-stage); display: flex; flex-direction: column; gap: 14px; max-width: 1100px; }
+.paste .pair { display: grid; grid-template-columns: 200px 260px 1fr; gap: 10px; }
+.plan { margin-left: var(--row-px); }
+
+/* ============ the frame, HUD, graph ============ */
+.frame { position: relative; border-radius: var(--r-frame); background: var(--color-stage); isolation: isolate; }
+.hud { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3; }
+.hud::before { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 26%, transparent), inset 0 0 90px color-mix(in srgb, var(--tone) 8%, transparent); }
+.hud .c { position: absolute; width: 30px; height: 30px; border: 0 solid var(--tone); opacity: .55; }
+.hud .tl { top: 6px; left: 6px; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 24px; }
+.hud .tr { top: 6px; right: 6px; border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 24px; }
+.hud .bl { bottom: 6px; left: 6px; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 24px; }
+.hud .br { bottom: 6px; right: 6px; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 24px; }
+.tools { position: absolute; z-index: 5; top: 18px; right: 18px; display: flex; gap: 8px; }
+.run .frame { padding: 66px 0 12px; }
+.gview { position: relative; width: 100%; margin: 0 0 8px; }
+.graph { font-family: var(--font-mono); overflow: visible; display: block; margin: 0 auto; }
+.graph .e path { fill: none; stroke: var(--g-edge); stroke-width: 1.3; }
+.graph .e.human path { stroke-dasharray: 4 4; }
+.graph .e text { font-size: var(--t-mono-sm); fill: var(--color-ink-3); paint-order: stroke; stroke: var(--color-stage); stroke-width: 5px; stroke-linejoin: round; }
+.graph .e.walked path { stroke: var(--g-edge-walked); stroke-width: 1.8; }
+.graph .e.walked text { fill: var(--color-ink-2); }
+.graph .e.last path { stroke: var(--tone); stroke-width: 2.2; }
+.graph .e.last text { fill: var(--color-ink); }
+.graph .mk path { fill: var(--g-edge); } .graph .mk-walked path { fill: var(--g-edge-walked); } .graph .mk-last path { fill: var(--tone); }
+.graph .n .nb { fill: var(--g-node); stroke: var(--g-stroke); stroke-width: 1; }
+.graph .n .nl { font-size: var(--t-mono); fill: var(--color-ink-3); }
+.graph .n .kg { fill: none; stroke: var(--color-ink-3); stroke-width: 1.3; }
+.graph .n.k-wait .nb { stroke-dasharray: 4 3; }
+.graph .n.k-final .nb { fill: var(--g-node-final); }
+.graph .n.walked .nb { fill: var(--g-node-walked); stroke: var(--g-stroke-walked); }
+.graph .n.walked .nl { fill: var(--color-ink); }
+.graph .lit-a { stop-color: var(--tone-hi); } .graph .lit-b { stop-color: var(--tone); }
+.graph .n.lit .nb { stroke: none; fill: url(#lit); }
+.graph .n.lit .nl { fill: var(--color-on-light); font-weight: 500; }
+.graph .n.lit .kg { stroke: var(--color-on-light); }
+.leader { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; overflow: visible; }
+.leader .ll { stroke: var(--tone); stroke-width: 1.5; stroke-dasharray: 2 4; stroke-linecap: round; fill: none; opacity: .75; }
+.leader .lt { fill: var(--tone); }
+
+/* ============ the ask ============ */
+.ask { position: relative; z-index: 1; margin: 0 12px; border-radius: var(--r-card); background: var(--color-raise); padding: 30px 32px; }
+.ask-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 48px; }
+.ask h2 { margin: 0 0 16px; font-size: var(--t-lg); font-weight: 600; letter-spacing: -0.015em; line-height: 1.3; }
+.ask .lede { color: var(--color-ink-2); }
+.handed { margin-top: 18px; } .handed .label { margin-bottom: 8px; }
+.answer { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.answer-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 6px; }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.choice { display: grid; grid-template-columns: 20px 1fr; column-gap: 12px; padding: 14px 16px; border-radius: var(--r-item); background: var(--color-raise-2); }
+.choice .tick { grid-row: span 3; width: 18px; height: 18px; margin-top: 2px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--color-ink-4); }
+.choice .cn { font-weight: 500; } .choice .ct { color: var(--color-ink-3); font-size: var(--t-sm); } .choice .ct code { color: var(--color-ink-2); }
+.choice .cd { color: var(--color-ink-2); font-size: var(--t-sm); margin-top: 4px; }
+.needs { margin: 0 0 18px; display: flex; flex-direction: column; gap: 14px; }
+.needs li { display: grid; grid-template-columns: 22px 1fr; gap: 12px; align-items: start; }
+.needs.small { margin: 6px 0 8px; gap: 8px; } .needs.small p { font-size: var(--t-sm); color: var(--color-ink-2); }
+dl.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 20px; align-items: baseline; }
+dl.kv > div { display: contents; }
+dl.kv dt { font: var(--t-mono) var(--font-mono); color: var(--color-ink-3); }
+dl.kv dd { min-width: 0; color: var(--color-ink); font-size: var(--t-sm); overflow-wrap: anywhere; }
+dl.kv dd.code { font: var(--t-mono) var(--font-mono); }
+dl.kv.inset { padding: 12px 14px; border-radius: var(--r-field); background: var(--color-stage); }
+.ask dl.kv.inset { background: var(--color-raise-2); }
+dl.kv.stacked { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+dl.kv.stacked dd { margin-bottom: 10px; }
+dl.kv.stacked dt.lbl { font: 500 var(--t-xs) var(--font-sans); color: var(--color-ink-3); }
+
+/* ============ below the frame ============ */
+.below { display: grid; grid-template-columns: minmax(0, 980px) 320px; justify-content: space-between; gap: 40px; margin-top: 48px; align-items: start; }
+.story .sec-h { margin: 0 0 18px; }
+.chapter { position: relative; padding: 0 0 26px 0; }
+.chapter::before { content: ""; position: absolute; left: 5px; top: 22px; bottom: 2px; width: 1px; background: var(--color-raise-3); }
+.chapter:last-child::before { display: none; }
+.ch-h { display: flex; align-items: center; gap: 12px; min-height: 24px; }
+.ch-t { font-weight: 500; font-size: var(--t-md); }
+.chapter:not(.now) .ch-t { color: var(--color-ink-2); }
+.ch-h code { color: var(--color-ink-3); }
+.ch-m { margin-left: auto; display: inline-flex; align-items: center; color: var(--color-ink-3); font: var(--t-mono-sm) var(--font-mono); }
+.chapter.now .ch-m { color: var(--color-ink-2); }
+.beats { margin: 10px 0 0 22px; display: flex; flex-direction: column; gap: 4px; }
+.beat { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 16px; padding: 10px 16px 10px 14px; border-radius: var(--r-item); }
+.beat:hover { background: var(--color-raise); }
+.beat .who { display: flex; flex-direction: column; gap: 1px; padding-top: 1px; }
+.beat .actor { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-xs); font-weight: 500; color: var(--color-ink-3); }
+.beat time { font: var(--t-mono-sm) var(--font-mono); color: var(--color-ink-3); }
+.beat .what { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.beat .bh { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; color: var(--color-ink); font-size: var(--t-md); }
+.beat .bh code { color: var(--color-ink); }
+.beat.you, .beat.them { background: var(--color-raise); }
+.beat.you .actor, .beat.them .actor { color: var(--color-ink); }
+.beat.cred .bq { color: var(--color-ink-3); font-size: var(--t-sm); }
+.beat.cred .bq code { color: var(--color-ink-2); font-size: var(--t-mono-sm); }
+.facts { display: flex; flex-direction: column; gap: 32px; }
+.facts .section-h { margin-bottom: 14px; }
+.checks { display: flex; flex-direction: column; gap: 12px; }
+.checks li { display: grid; grid-template-columns: 9px 1fr; gap: 12px; align-items: start; }
+.checks li > .block { margin-top: 6px; }
+.checks code { color: var(--color-ink); }
+.checks .cw { margin-left: 8px; font-size: var(--t-xs); color: var(--color-ink-3); }
+.checks p { font-size: var(--t-sm); color: var(--color-ink-3); margin-top: 2px; }
+.fact-agent { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.fact-agent .fa-n { display: block; color: var(--color-ink); font-size: var(--t-sm); }
+.fact-agent .fa-s { display: block; color: var(--color-ink-3); font: var(--t-mono-sm) var(--font-mono); margin-top: 2px; }
+
+/* ============ sign in ============ */
+.signin { max-width: 560px; margin: 96px auto 0; display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
+.signin .e-t { color: var(--color-ink); font-size: var(--t-xl); font-weight: 600; letter-spacing: -0.03em; line-height: 1.15; }
+.signin p { color: var(--color-ink-2); }
+.signin .pill { margin-top: 8px; }
+.after { max-width: 1100px; margin: 72px auto 0; }
+.after > .label { margin: 0 0 12px var(--row-px); }
+.after .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.after .empty { margin: 0; max-width: none; padding: 32px 36px 36px; }
+.after .field { width: 100%; }
+.after .field .hint code { font-size: var(--t-mono-sm); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Turn, the mark: three blocks on a path that turns a corner (src/ui/mark.tsx). -->
+    <mask id="mk0" maskUnits="userSpaceOnUse" x="-8" y="-8" width="80" height="80"><rect x="-8" y="-8" width="80" height="80" fill="#fff"/><path d="M27.08 12.82L42.35 20.46L36.92 23.18L21.65 15.54Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/><path d="M21.65 15.54L36.92 23.18L36.92 26.57L21.65 18.93Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/><path d="M42.35 20.46L36.92 23.18L36.92 26.57L42.35 23.85Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/><path d="M36.92 27.25L42.35 29.96L27.08 37.6L21.65 34.88Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/><path d="M21.65 34.88L27.08 37.6L27.08 40.99L21.65 38.28Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/><path d="M42.35 29.96L27.08 37.6L27.08 40.99L42.35 33.36Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/></mask>
+    <mask id="mk1" maskUnits="userSpaceOnUse" x="-8" y="-8" width="80" height="80"><rect x="-8" y="-8" width="80" height="80" fill="#fff"/><path d="M46.42 18.42L60 25.21L46.42 32L32.85 25.21Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/><path d="M32.85 25.21L46.42 32L46.42 45.58L32.85 38.79Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/><path d="M60 25.21L46.42 32L46.42 45.58L60 38.79Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/></mask>
+    <mask id="mk2" maskUnits="userSpaceOnUse" x="-8" y="-8" width="80" height="80"><rect x="-8" y="-8" width="80" height="80" fill="#fff"/><path d="M36.92 27.25L42.35 29.96L27.08 37.6L21.65 34.88Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/><path d="M21.65 34.88L27.08 37.6L27.08 40.99L21.65 38.28Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/><path d="M42.35 29.96L27.08 37.6L27.08 40.99L42.35 33.36Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/></mask>
+    <mask id="mk3" maskUnits="userSpaceOnUse" x="-8" y="-8" width="80" height="80"><rect x="-8" y="-8" width="80" height="80" fill="#fff"/><path d="M17.58 32.85L31.15 39.64L17.58 46.42L4 39.64Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/><path d="M4 39.64L17.58 46.42L17.58 60L4 53.21Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/><path d="M31.15 39.64L17.58 46.42L17.58 60L31.15 53.21Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/></mask>
+    <symbol id="mark" viewBox="4 4 56 56">
+      <g mask="url(#mk0)"><path d="M17.58 4L31.15 10.79L17.58 17.58L4 10.79Z" fill="#7c7c86"/><path d="M4 10.79L17.58 17.58L17.58 31.15L4 24.36Z" fill="#53535c"/><path d="M31.15 10.79L17.58 17.58L17.58 31.15L31.15 24.36Z" fill="#38383f"/></g>
+      <g mask="url(#mk1)"><path d="M27.08 12.82L42.35 20.46L36.92 23.18L21.65 15.54Z" fill="#7c7c86"/><path d="M21.65 15.54L36.92 23.18L36.92 26.57L21.65 18.93Z" fill="#53535c"/><path d="M42.35 20.46L36.92 23.18L36.92 26.57L42.35 23.85Z" fill="#38383f"/></g>
+      <g mask="url(#mk2)"><path d="M46.42 18.42L60 25.21L46.42 32L32.85 25.21Z" fill="#93c2ff"/><path d="M32.85 25.21L46.42 32L46.42 45.58L32.85 38.79Z" fill="#3b82f6"/><path d="M60 25.21L46.42 32L46.42 45.58L60 38.79Z" fill="#1f55c8"/></g>
+      <g mask="url(#mk3)"><path d="M36.92 27.25L42.35 29.96L27.08 37.6L21.65 34.88Z" fill="#7c7c86"/><path d="M21.65 34.88L27.08 37.6L27.08 40.99L21.65 38.28Z" fill="#53535c"/><path d="M42.35 29.96L27.08 37.6L27.08 40.99L42.35 33.36Z" fill="#38383f"/></g>
+      <g><path d="M17.58 32.85L31.15 39.64L17.58 46.42L4 39.64Z" fill="#7c7c86"/><path d="M4 39.64L17.58 46.42L17.58 60L4 53.21Z" fill="#53535c"/><path d="M31.15 39.64L17.58 46.42L17.58 60L31.15 53.21Z" fill="#38383f"/></g>
+    </symbol>
+    <!-- One block, in a tone. -->
+    <symbol id="blk" viewBox="0 0 10 10"><rect x="0.65" y="0.65" width="8.7" height="8.7" rx="2.6" fill="currentColor"/></symbol>
+    <!-- A neutral agent glyph: the mock does not carry the agents' trademarks. -->
+    <symbol id="agent" viewBox="0 0 14 14"><path d="M5 3.5 1.8 7 5 10.5M9 3.5 12.2 7 9 10.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev" viewBox="0 0 14 14"><path d="M5.5 3.5 9 7l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="down" viewBox="0 0 14 14"><path d="M3.5 5.5 7 9l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="back" viewBox="0 0 14 14"><path d="M8.5 3.5 5 7l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <linearGradient id="lit" x1="0" y1="0" x2="0" y2="1"><stop class="lit-a" offset="0" stop-color="#ffd9a1"/><stop class="lit-b" offset="1" stop-color="#f2b45a"/></linearGradient>
+  </defs>
+</svg>
+
+<nav class="chrome" aria-label="Screens">
+  <button class="t on" data-go="signin">Sign in</button>
+  <button class="t" data-go="team">Team</button>
+  <button class="t" data-go="credentials">Credentials</button>
+  <button class="t" data-go="runs">Runs</button>
+  <button class="t" data-go="run">Run</button>
+  <span class="note">hosted machine · 1440 · the four new screens, in the product's existing look</span>
+</nav>
+
+<!-- ======================================================= SIGN IN ======================================================= -->
+<section class="mock on" data-screen="signin">
+  <nav class="bar"><a class="brand" href="#"><svg width="22" height="22"><use href="#mark"/></svg><span>machine</span></a><div></div><div class="bar-r"></div></nav>
+  <main class="screen">
+    <div class="page">
+      <div class="signin">
+        <svg width="44" height="44"><use href="#mark"/></svg>
+        <h1 class="e-t">machine</h1>
+        <p>Processes you draw. Agents follow them. A tool keeps them on the rails.</p>
+        <svg class="glyph wait" width="48" height="14" viewBox="0 0 48 14" aria-hidden="true"><rect class="a" x="1" y="3" width="8" height="8" rx="2.2"/><rect class="a" x="12" y="3" width="8" height="8" rx="2.2"/><rect class="a" x="23" y="3" width="8" height="8" rx="2.2"/><rect class="a" x="34" y="3" width="8" height="8" rx="2.2"/></svg>
+        <a class="pill primary" href="#">Sign in</a>
+        <span class="hint">Opens WorkOS. If someone invited you, use the email the invitation came to.</span>
+      </div>
+
+      <div class="after">
+        <span class="label">Back from WorkOS, one of these, on the same surface</span>
+        <div class="two">
+          <div class="empty">
+            <p class="e-t">Create a team</p>
+            <p>Your machines, runs, agents and credentials live in a team. Invite people after.</p>
+            <label class="field"><span class="label">Name</span><input class="prose" value="Plannotator"><span class="hint">Its address will be <code>app.machine.run/plannotator</code></span></label>
+            <a class="pill primary" href="#">Create team</a>
+          </div>
+          <div class="empty">
+            <p class="e-t">Michael invited you to Plannotator</p>
+            <p>You will see the team's runs and machines, answer runs that need someone, and connect your own agents.</p>
+            <div class="form-foot" style="width:100%"><a class="pill primary" href="#">Join Plannotator</a><a class="link" href="#">Not you? Sign out</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ======================================================= TEAM ======================================================= -->
+<section class="mock" data-screen="team">
+  <nav class="bar">
+    <div class="bar-l"><a class="brand" href="#"><svg width="22" height="22"><use href="#mark"/></svg><span>machine</span></a><a class="pill sm quiet team-pill" href="#">Plannotator <svg class="chev"><use href="#down"/></svg></a><div class="menu" role="menu">
+        <a class="on" href="#">Plannotator <svg class="block t-none" width="9" height="9"><use href="#blk"/></svg></a>
+        <a href="#">tldraw</a>
+        <hr>
+        <a href="#">Team</a>
+        <a href="#">New team</a>
+        <hr>
+        <span>michael@plannotator.dev</span>
+        <a href="#">Sign out</a>
+      </div></div>
+    <div class="switch"><a href="#">Runs <span class="need"><svg class="block t-blocked" width="9" height="9"><use href="#blk"/></svg>2</span><span class="need"><svg class="block t-waiting" width="9" height="9"><use href="#blk"/></svg>1</span></a><a href="#">Machines</a><a href="#">Credentials</a></div>
+    <div class="bar-r"></div>
+  </nav>
+  <main class="screen">
+    <div class="page">
+      <header class="top">
+        <div class="head-row">
+          <div class="head-text"><h1>Plannotator</h1><div class="sub"><code>plannotator</code><span class="sep"></span>4 members<span class="sep"></span>1 invitation<span class="sep"></span>2 agent keys</div></div>
+          <div class="actions"><a class="pill quiet" href="#">Rename</a><a class="pill primary" href="#">Invite</a></div>
+        </div>
+      </header>
+
+      <div class="sections">
+        <section>
+          <div class="sec-h"><h2 class="section-h">Members</h2><span class="quiet">Owners manage people and the team. Everyone does the work.</span></div>
+          <div class="rows">
+            <div class="row plain"><span class="r-main"><span class="r-title">Michael Ramos <span class="dim" style="font-weight:400">· you</span></span><span class="r-sub">michael@plannotator.dev</span></span><span class="r-side"><span class="r-role">Owner</span></span></div>
+            <div class="row plain sel"><span class="r-main"><span class="r-title">Dana Whitfield</span><span class="r-sub">dana@plannotator.dev</span></span><span class="r-side"><span class="r-role">Member</span><span class="r-links"><a class="link" href="#">Make owner</a><a class="link" href="#">Remove</a></span></span></div>
+            <div class="row plain"><span class="r-main"><span class="r-title">Jun Park</span><span class="r-sub">jun@plannotator.dev</span></span><span class="r-side"><span class="r-role">Member</span></span></div>
+            <div class="row plain"><span class="r-main"><span class="r-title">Priya Natarajan</span><span class="r-sub">priya@plannotator.dev</span></span><span class="r-side"><span class="r-role">Owner</span></span></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="sec-h"><h2 class="section-h">Invitations</h2><span class="quiet">One email, one link. It ends on the sign-in page; the seat is ready when they arrive.</span></div>
+          <div class="inline-form" style="margin: 0 0 14px var(--row-px)">
+            <label class="field narrow"><span class="label">Email</span><input class="prose" placeholder="name@company.com"></label>
+            <a class="pill" href="#">Invite</a>
+          </div>
+          <div class="rows">
+            <div class="row plain"><span class="r-main"><span class="r-title">sam@tldraw.com</span><span class="r-sub">sent Oct 18 by Michael<span class="sep"></span>not accepted yet</span></span><span class="r-side"><span class="r-links"><a class="link" href="#">Resend</a><a class="link" href="#">Revoke</a></span></span></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="sec-h"><h2 class="section-h">Agent keys</h2><span class="quiet">How an agent reaches the team.</span></div>
+          <p class="ctx">An agent connects over MCP at <code>https://app.machine.run/mcp</code> with a key you make here. Runs it starts carry your name. The same key signs the <code>machine</code> CLI in, so <code>machine run</code> can lease the team's credentials to a command.</p>
+          <div class="once">
+            <span class="label">Your new key <code>laptop</code>, shown once</span>
+            <div class="key">mk_live_7Hq2vNc4xR9tLm3pWz8KdY5sBf1Ge0JaQ6</div>
+            <span class="label">Add it to Claude Code</span>
+            <div class="cmd">claude mcp add --transport http machine https://app.machine.run/mcp --header <b>"Authorization: Bearer mk_live_7Hq2vNc4xR9tLm3pWz8KdY5sBf1Ge0JaQ6"</b></div>
+            <span class="label">And on that computer, once</span>
+            <div class="cmd">machine login <b>mk_live_7Hq2vNc4xR9tLm3pWz8KdY5sBf1Ge0JaQ6</b></div>
+            <div class="form-foot"><span class="hint">Shown once. Lose it, make another.</span><div class="actions"><a class="pill" href="#">Copy</a><a class="pill primary" href="#">Done</a></div></div>
+          </div>
+          <div class="rows">
+            <div class="row plain"><span class="r-main"><span class="r-title">laptop</span><span class="r-sub"><code>mk_live_7Hq2…</code><span class="sep"></span>michael<span class="sep"></span>made Oct 12<span class="sep"></span>used 3m ago</span></span><span class="r-side"><a class="link" href="#">Revoke</a></span></div>
+            <div class="row plain"><span class="r-main"><span class="r-title">ci</span><span class="r-sub"><code>mk_live_Qe91xL…</code><span class="sep"></span>dana<span class="sep"></span>made Oct 15<span class="sep"></span>used 2h ago</span></span><span class="r-side"><a class="link" href="#">Revoke</a></span></div>
+            <div class="row plain" style="color:var(--color-ink-3)"><span class="r-main"><span class="r-title" style="color:var(--color-ink-3);font-weight:500">+ New key</span></span></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="sec-h"><h2 class="section-h">Plan</h2></div>
+          <p class="quiet plan">Free while hosted machine is in preview. Nothing to pay yet.</p>
+        </section>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ======================================================= CREDENTIALS ======================================================= -->
+<section class="mock" data-screen="credentials">
+  <nav class="bar">
+    <div class="bar-l"><a class="brand" href="#"><svg width="22" height="22"><use href="#mark"/></svg><span>machine</span></a><a class="pill sm quiet team-pill" href="#">Plannotator <svg class="chev"><use href="#down"/></svg></a></div>
+    <div class="switch"><a href="#">Runs <span class="need"><svg class="block t-blocked" width="9" height="9"><use href="#blk"/></svg>2</span><span class="need"><svg class="block t-waiting" width="9" height="9"><use href="#blk"/></svg>1</span></a><a href="#">Machines</a><a class="on" href="#">Credentials</a></div>
+    <div class="bar-r"></div>
+  </nav>
+  <main class="screen">
+    <div class="page">
+      <header class="top">
+        <div class="head-row">
+          <div class="head-text"><h1>Credentials</h1><div class="sub">What agents may act with on Plannotator's behalf<span class="sep"></span>3 connected<span class="sep"></span>1 needed</div></div>
+          <div class="actions"><a class="pill" href="#">Connect GitHub</a><a class="pill" href="#">Connect Linear</a><a class="pill primary" href="#">Paste a token</a></div>
+        </div>
+      </header>
+
+      <div class="paste">
+        <div class="pair">
+          <label class="field"><span class="label">Provider</span><input class="prose" value="npm"><span class="hint">GitHub, npm, AWS, or any HTTP API.</span></label>
+          <label class="field"><span class="label">Name</span><input class="prose" value="npm publish token"><span class="hint">How the team will see it.</span></label>
+          <label class="field"><span class="label">Token</span><input type="password" value="npm_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"><span class="hint">Checked with <code>npm whoami</code> before it is saved. Stored encrypted; agents use it only inside a run of a machine that needs it, and every use is on that run's history.</span></label>
+        </div>
+        <div class="form-foot"><span class="hint">Then bind it to a machine's slot from the machine page, or pick it when a run asks.</span><div class="actions"><a class="pill quiet" href="#">Cancel</a><a class="pill primary" href="#">Save</a></div></div>
+      </div>
+
+      <section class="group">
+        <h2 class="eyebrow label">Needed<span class="n">1</span></h2>
+        <div class="rows">
+          <a class="row" href="#">
+            <span class="r-glyph r-stat"><svg class="block t-waiting" width="12" height="12"><use href="#blk"/></svg></span>
+            <span class="r-main"><span class="r-title">Triage an issue needs <code style="font-size:var(--t-md)">linear</code></span><span class="r-sub">Linear<span class="sep"></span>to read the issue and its thread<span class="sep"></span>nothing connected yet</span><span class="r-ask">One run is blocked until it is.</span></span>
+            <span class="r-side"><span class="pill sm primary">Connect Linear<svg class="chev"><use href="#chev"/></svg></span></span>
+          </a>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="eyebrow label">Connected<span class="n">3</span></h2>
+        <div class="rows">
+          <div class="row">
+            <span class="r-glyph r-stat"><svg class="block t-none" width="10" height="10"><use href="#blk"/></svg></span>
+            <span class="r-main"><span class="r-title">GitHub <span class="sep"></span> michael</span><span class="r-sub">Connection<span class="sep"></span>GitHub App as <code>michael</code><span class="sep"></span>repositories plannotator, plannotator-docs<span class="sep"></span>connected Oct 12</span><span class="r-sub">Used by <a href="#" style="margin-left:4px">Ship a bug fix</a>&nbsp;<code>github</code>,&nbsp;<a href="#">Release Plannotator</a>&nbsp;<code>github</code></span></span>
+            <span class="r-side"><span class="r-time">used 3m ago</span><a class="link" href="#">Remove</a></span>
+          </div>
+          <div class="row">
+            <span class="r-glyph r-stat"><svg class="block t-none" width="10" height="10"><use href="#blk"/></svg></span>
+            <span class="r-main"><span class="r-title">npm publish token</span><span class="r-sub">Token<span class="sep"></span>npm as <code>plannotator-bot</code><span class="sep"></span>pasted by Dana, Oct 15</span><span class="r-sub">Used by <a href="#" style="margin-left:4px">Release Plannotator</a>&nbsp;<code>npm</code><span class="sep"></span>live only in <code>publish</code></span></span>
+            <span class="r-side"><span class="r-time">used 2h ago</span><a class="link" href="#">Remove</a></span>
+          </div>
+          <div class="row sel">
+            <span class="r-glyph r-stat"><svg class="block t-none" width="10" height="10"><use href="#blk"/></svg></span>
+            <span class="r-main"><span class="r-title">AWS <span class="sep"></span> deploy</span><span class="r-sub">Token<span class="sep"></span>AWS account <code>975050215161</code><span class="sep"></span>pasted by Michael, Oct 15</span><span class="r-sub">Used by <a href="#" style="margin-left:4px">Release Plannotator</a>&nbsp;<code>aws</code></span></span>
+            <span class="r-side"><span class="r-time">never used</span><span class="pill sm" style="margin-top:4px"><svg class="block t-blocked" width="9" height="9"><use href="#blk"/></svg>Remove AWS · deploy for good</span></span>
+          </div>
+        </div>
+        <p class="quiet" style="margin: 14px 0 0 var(--row-px)">Removing one leaves its slots empty; the next run that needs them blocks and says so. Runs that used it keep the record.</p>
+      </section>
+    </div>
+  </main>
+</section>
+
+<!-- ======================================================= RUNS (team scope) ======================================================= -->
+<section class="mock" data-screen="runs">
+  <nav class="bar">
+    <div class="bar-l"><a class="brand" href="#"><svg width="22" height="22"><use href="#mark"/></svg><span>machine</span></a><a class="pill sm quiet team-pill" href="#">Plannotator <svg class="chev"><use href="#down"/></svg></a></div>
+    <div class="switch"><a class="on" href="#">Runs <span class="need"><svg class="block t-blocked" width="9" height="9"><use href="#blk"/></svg>2</span><span class="need"><svg class="block t-waiting" width="9" height="9"><use href="#blk"/></svg>1</span></a><a href="#">Machines</a><a href="#">Credentials</a></div>
+    <div class="bar-r"></div>
+  </nav>
+  <main class="screen">
+    <div class="page">
+      <header class="top">
+        <div class="head-row">
+          <div class="head-text"><h1>Runs</h1><div class="sub">3 need you<span class="sep"></span>1 running<span class="sep"></span>5 finished</div></div>
+        </div>
+      </header>
+
+      <section class="group">
+        <h2 class="eyebrow label">Needs you<span class="n">3</span></h2>
+        <div class="rows">
+          <a class="row t-blocked big" href="#">
+            <span class="r-glyph"><svg class="glyph t-blocked" width="150" height="14" viewBox="0 0 150 14"><rect class="lit" x="93" y="1" width="12" height="12" rx="3.3"/><rect class="a" x="108" y="3" width="8" height="8" rx="2.2"/><rect class="a" x="119" y="3" width="8" height="8" rx="2.2"/><rect class="a" x="130" y="3" width="8" height="8" rx="2.2"/><rect class="a" x="141" y="3" width="8" height="8" rx="2.2"/></svg></span>
+            <span class="r-main"><span class="r-title">Triage an issue</span><span class="r-sub">Blocked at <code>fetch_issue</code><span class="sep"></span>Read the issue and its thread</span><span class="r-ask">Connect Linear for Triage an issue (<code>fetch_issue</code>). Nothing is bound to its <code>linear</code> slot.</span></span>
+            <span class="r-side"><span class="r-time">8m ago</span><span class="r-agent"><span class="amark"><svg><use href="#agent"/></svg></span>Claude Code<span class="sep"></span>jun</span><span class="pill sm primary">Answer<svg class="chev"><use href="#chev"/></svg></span></span>
+          </a>
+          <a class="row t-blocked big" href="#">
+            <span class="r-glyph"><svg class="glyph t-blocked" width="150" height="14" viewBox="0 0 150 14"><rect class="more" x="6" y="6" width="2" height="2" rx="1"/><rect class="more" x="9" y="6" width="2" height="2" rx="1"/><rect class="more" x="12" y="6" width="2" height="2" rx="1"/><rect class="w" x="16" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="27" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="38" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="49" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="60" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="71" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="82" y="3" width="8" height="8" rx="2.2"/><rect class="lit" x="93" y="1" width="12" height="12" rx="3.3"/><rect class="a" x="108" y="3" width="8" height="8" rx="2.2"/></svg></span>
+            <span class="r-main"><span class="r-title">Release Plannotator</span><span class="r-sub">Blocked at <code>smoke</code><span class="sep"></span>Smoke-test the installs</span><span class="r-ask">Decide whether the OpenCode and Pi plugin loads may run against the real agent installs on this machine, or confirm they should be recorded as skipped for this fixture run</span><span class="quiet">and 1 more question</span></span>
+            <span class="r-side"><span class="r-time">17h ago</span><span class="r-agent"><span class="amark"><svg><use href="#agent"/></svg></span>Claude Code (Fable 5.1)<span class="sep"></span>michael</span><span class="pill sm primary">Answer<svg class="chev"><use href="#chev"/></svg></span></span>
+          </a>
+          <a class="row t-waiting big" href="#">
+            <span class="r-glyph"><svg class="glyph t-waiting" width="150" height="14" viewBox="0 0 150 14"><rect class="w" x="49" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="60" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="71" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="82" y="3" width="8" height="8" rx="2.2"/><rect class="lit" x="93" y="1" width="12" height="12" rx="3.3"/><rect class="a" x="108" y="3" width="8" height="8" rx="2.2"/></svg></span>
+            <span class="r-main"><span class="r-title">Ship a bug fix</span><span class="r-sub">Your decision at <code>await_review</code><span class="sep"></span>Wait for human review</span><span class="r-ask">Choose approved or changes requested.</span></span>
+            <span class="r-side"><span class="r-time">4m ago</span><span class="r-agent"><span class="amark"><svg><use href="#agent"/></svg></span>Claude Code<span class="sep"></span>michael</span><span class="pill sm primary">Decide<svg class="chev"><use href="#chev"/></svg></span></span>
+          </a>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="eyebrow label">Running<span class="n">1</span></h2>
+        <div class="rows">
+          <a class="row t-running" href="#">
+            <span class="r-glyph"><svg class="glyph t-running" width="150" height="14" viewBox="0 0 150 14"><rect class="w" x="49" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="60" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="71" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="82" y="3" width="8" height="8" rx="2.2"/><rect class="lit" x="93" y="1" width="12" height="12" rx="3.3"/><rect class="a" x="108" y="3" width="8" height="8" rx="2.2"/><rect class="a" x="119" y="3" width="8" height="8" rx="2.2"/><rect class="a" x="130" y="3" width="8" height="8" rx="2.2"/><rect class="a" x="141" y="3" width="8" height="8" rx="2.2"/></svg></span>
+            <span class="r-main"><span class="r-title">Release Plannotator</span><span class="r-sub">At <code>build</code><span class="sep"></span>Build and verify the packages<span class="sep"></span><span class="dim">5 steps to go</span></span></span>
+            <span class="r-side"><span class="r-time">1m ago</span><span class="r-agent"><span class="amark"><svg><use href="#agent"/></svg></span>Codex CLI<span class="sep"></span>dana</span></span>
+          </a>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="eyebrow label">Finished<span class="n">5</span></h2>
+        <div class="rows">
+          <a class="row t-succeeded" href="#">
+            <span class="r-glyph"><svg class="glyph t-succeeded" width="150" height="14" viewBox="0 0 150 14"><rect class="w" x="38" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="49" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="60" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="71" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="82" y="3" width="8" height="8" rx="2.2"/><rect class="lit" x="93" y="1" width="12" height="12" rx="3.3"/></svg></span>
+            <span class="r-main"><span class="r-title">Ship a bug fix</span><span class="r-sub">Merged<span class="sep"></span><span class="dim">took 14m 02s</span></span></span>
+            <span class="r-side"><span class="r-time">2h ago</span><span class="r-agent"><span class="amark"><svg><use href="#agent"/></svg></span>Claude Code<span class="sep"></span>jun</span></span>
+          </a>
+          <a class="row t-succeeded" href="#">
+            <span class="r-glyph"><svg class="glyph t-succeeded" width="150" height="14" viewBox="0 0 150 14"><rect class="w" x="49" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="60" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="71" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="82" y="3" width="8" height="8" rx="2.2"/><rect class="lit" x="93" y="1" width="12" height="12" rx="3.3"/></svg></span>
+            <span class="r-main"><span class="r-title">Draft a changelog entry</span><span class="r-sub">Ready<span class="sep"></span><span class="dim">took 1m 55s</span></span></span>
+            <span class="r-side"><span class="r-time">3h ago</span><span class="r-agent"><span class="amark"><svg><use href="#agent"/></svg></span>Claude Code<span class="sep"></span>michael</span></span>
+          </a>
+          <a class="row t-failed" href="#">
+            <span class="r-glyph"><svg class="glyph t-failed" width="150" height="14" viewBox="0 0 150 14"><rect class="w" x="71" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="82" y="3" width="8" height="8" rx="2.2"/><rect class="lit" x="93" y="1" width="12" height="12" rx="3.3"/></svg></span>
+            <span class="r-main"><span class="r-title">tldraw release loop</span><span class="r-sub">Failed at <code>gate</code><span class="sep"></span><span class="dim">pnpm check exited 1 three times</span></span></span>
+            <span class="r-side"><span class="r-time">5h ago</span><span class="r-agent"><span class="amark"><svg><use href="#agent"/></svg></span>Codex CLI<span class="sep"></span>dana</span></span>
+          </a>
+          <a class="row t-succeeded" href="#">
+            <span class="r-glyph"><svg class="glyph t-succeeded" width="150" height="14" viewBox="0 0 150 14"><rect class="more" x="6" y="6" width="2" height="2" rx="1"/><rect class="more" x="9" y="6" width="2" height="2" rx="1"/><rect class="more" x="12" y="6" width="2" height="2" rx="1"/><rect class="w" x="16" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="27" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="38" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="49" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="60" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="71" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="82" y="3" width="8" height="8" rx="2.2"/><rect class="lit" x="93" y="1" width="12" height="12" rx="3.3"/></svg></span>
+            <span class="r-main"><span class="r-title">Release Plannotator</span><span class="r-sub">Shipped and smoke-tested<span class="sep"></span><span class="dim">took 22m 10s</span></span></span>
+            <span class="r-side"><span class="r-time">yesterday</span><span class="r-agent"><span class="amark"><svg><use href="#agent"/></svg></span>Claude Code (Fable 5.1)<span class="sep"></span>michael</span></span>
+          </a>
+          <a class="row t-cancelled" href="#">
+            <span class="r-glyph"><svg class="glyph t-cancelled" width="150" height="14" viewBox="0 0 150 14"><rect class="w" x="71" y="3" width="8" height="8" rx="2.2"/><rect class="w" x="82" y="3" width="8" height="8" rx="2.2"/><rect x="93" y="1" width="12" height="12" rx="3.3" fill="none" stroke="var(--color-ink-3)" stroke-width="1.3" stroke-dasharray="2.5 2"/></svg></span>
+            <span class="r-main"><span class="r-title">Code review loop</span><span class="r-sub">Cancelled at <code>second_opinion</code></span></span>
+            <span class="r-side"><span class="r-time">yesterday</span><span class="r-agent"><span class="amark"><svg><use href="#agent"/></svg></span>Claude Code<span class="sep"></span>priya</span></span>
+          </a>
+        </div>
+      </section>
+    </div>
+  </main>
+</section>
+
+<!-- ======================================================= RUN (waiting, with a credential used) ======================================================= -->
+<section class="mock" data-screen="run">
+  <nav class="bar">
+    <div class="bar-l"><a class="brand" href="#"><svg width="22" height="22"><use href="#mark"/></svg><span>machine</span></a><a class="pill sm quiet team-pill" href="#">Plannotator <svg class="chev"><use href="#down"/></svg></a></div>
+    <div class="switch"><a class="on" href="#">Runs <span class="need"><svg class="block t-blocked" width="9" height="9"><use href="#blk"/></svg>2</span><span class="need"><svg class="block t-waiting" width="9" height="9"><use href="#blk"/></svg>1</span></a><a href="#">Machines</a><a href="#">Credentials</a></div>
+    <div class="bar-r"></div>
+  </nav>
+  <main class="screen">
+    <div class="page run">
+      <header class="top">
+        <a class="back" href="#"><svg width="14" height="14"><use href="#back"/></svg>Runs</a>
+        <div class="head-row">
+          <div class="head-text"><h1>Ship a bug fix</h1><div class="sub">Your decision at <code>await_review</code> for 4m<span class="sep"></span>started 12:03 by <span class="agent-inline"><span class="amark"><svg><use href="#agent"/></svg></span>Claude Code</span><span class="sep"></span>michael</div></div>
+          <div class="actions"><a class="pill quiet" href="#">Cancel run</a><a class="pill" href="#">Open machine</a></div>
+        </div>
+      </header>
+
+      <section class="frame" data-tone="waiting">
+        <div class="hud" data-tone="waiting" aria-hidden="true"><i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i></div>
+        <div class="readout"><svg class="block t-waiting" width="11" height="11"><use href="#blk"/></svg><span class="rs">Your decision</span><span class="ra">at await_review</span><span class="rt">for 4m</span></div>
+        <div class="tools"><a class="pill sm ghost" href="#">Full screen</a></div>
+        <div class="gview">
+          <!-- ship-fix, laid out left to right; the walk is reproduce → fix → verify → open_pr → await_review -->
+          <svg class="graph" width="1180" height="250" viewBox="0 0 1180 250">
+            <g class="e walked"><path d="M138 125 H196"/><text x="167" y="96" text-anchor="middle">reproduced</text></g>
+            <g class="e"><path d="M106 103 C 120 60, 200 40, 1040 40 C 1080 40, 1100 60, 1100 80" /><text x="560" y="36" text-anchor="middle">cannot_reproduce</text></g>
+            <g class="e walked"><path d="M292 125 H352"/><text x="322" y="118" text-anchor="middle">fixed</text></g>
+            <g class="e"><path d="M416 147 C 400 190, 300 190, 280 147"/><text x="348" y="186" text-anchor="middle">tests_failed</text></g>
+            <g class="e walked"><path d="M474 125 H534"/><text x="504" y="118" text-anchor="middle">passed</text></g>
+            <g class="e walked last"><path d="M650 125 H716"/><text x="683" y="118" text-anchor="middle">opened</text></g>
+            <g class="e human"><path d="M870 125 H936"/><text x="903" y="118" text-anchor="middle">approved</text></g>
+            <g class="e human"><path d="M800 147 C 760 215, 330 215, 260 147"/><text x="530" y="208" text-anchor="middle">changes_requested</text></g>
+            <!-- arrowheads -->
+            <g class="mk mk-walked"><path d="M190 120 L198 125 L190 130 Z"/><path d="M346 120 L354 125 L346 130 Z"/><path d="M528 120 L536 125 L528 130 Z"/></g>
+            <g class="mk mk-last"><path d="M710 120 L718 125 L710 130 Z"/></g>
+            <g class="mk"><path d="M930 120 L938 125 L930 130 Z"/><path d="M262 142 L256 148 L264 150 Z"/><path d="M284 142 L278 148 L286 150 Z"/><path d="M1095 76 L1100 84 L1105 76 Z"/></g>
+            <!-- nodes -->
+            <g class="n walked"><rect class="nb" x="40" y="103" width="98" height="44" rx="13"/><text class="nl" x="89" y="129" text-anchor="middle">reproduce</text></g>
+            <g class="n walked"><rect class="nb" x="198" y="103" width="94" height="44" rx="13"/><text class="nl" x="245" y="129" text-anchor="middle">fix</text></g>
+            <g class="n walked"><rect class="nb" x="354" y="103" width="120" height="44" rx="13"/><text class="nl" x="414" y="129" text-anchor="middle">verify</text></g>
+            <g class="n walked"><rect class="nb" x="536" y="103" width="114" height="44" rx="13"/><text class="nl" x="593" y="129" text-anchor="middle">open_pr</text></g>
+            <g class="n lit k-wait"><rect class="nb" x="718" y="103" width="152" height="44" rx="13"/><path class="kg" d="M736 130 a6 6 0 0 1 12 0"/><text class="nl" x="800" y="129" text-anchor="middle">await_review</text></g>
+            <g class="n k-final"><rect class="nb" x="938" y="103" width="100" height="44" rx="22"/><text class="nl" x="988" y="129" text-anchor="middle">merged</text></g>
+            <g class="n k-final"><rect class="nb" x="1050" y="84" width="100" height="44" rx="22"/><text class="nl" x="1100" y="110" text-anchor="middle">closed</text></g>
+          </svg>
+        </div>
+        <svg class="leader" data-tone="waiting" aria-hidden="true"><path class="ll" d="M884,219 V318"/><rect class="lt" x="880" y="320" width="8" height="8" rx="2.2"/></svg>
+
+        <div class="ask t-waiting">
+          <div class="ask-grid">
+            <div class="ask-main">
+              <div class="kind">your decision · 2 choices</div>
+              <h2>Wait for human review</h2>
+              <div class="clamp"><p>Opened PR #214 from fix/flaky-inbox-toast against main. 3 commits, 212 tests green. The fix replaces the toast's timer with the store's own clock so it cannot outlive the reply box.</p></div>
+              <div class="handed"><span class="label">Report from <code>open_pr</code></span>
+                <dl class="kv inset"><div><dt>pr_url</dt><dd class="code">https://github.com/backnotprop/plannotator/pull/214</dd></div><div><dt>commits</dt><dd class="code">3</dd></div><div><dt>base</dt><dd class="code">main</dd></div></dl>
+              </div>
+            </div>
+            <div class="answer">
+              <span class="label">Choose what happens next</span>
+              <div class="choices">
+                <div class="choice"><span class="tick"></span><span class="cn">Approved</span><span class="ct">then <code>merged</code><span class="sep"></span>Merged</span><span class="cd">The PR is good. The agent merges it.</span></div>
+                <div class="choice"><span class="tick"></span><span class="cn">Changes requested</span><span class="ct">then <code>fix</code><span class="sep"></span>Fix the bug</span><span class="cd">Say what to change in the note.</span></div>
+              </div>
+              <textarea placeholder="A note for the agent (optional)"></textarea>
+              <div class="answer-foot"><span class="hint">Nothing moves until you send.</span><span class="pill primary" disabled>Choose one</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="below">
+        <section class="story">
+          <div class="sec-h" style="margin-left:0"><h3 class="section-h">History</h3><span class="quiet">newest first<span class="sep"></span>4 moves<span class="sep"></span>1 credential use</span></div>
+          <ol class="chapters">
+            <li class="chapter now">
+              <div class="ch-h"><svg class="block t-waiting" width="12" height="12"><use href="#blk"/></svg><span class="ch-t">Wait for human review</span><code>await_review</code><span class="ch-m">for 4m</span></div>
+            </li>
+            <li class="chapter">
+              <div class="ch-h"><svg class="block t-none" width="10" height="10"><use href="#blk"/></svg><span class="ch-t">Open the pull request</span><code>open_pr</code><span class="ch-m">12:09<span class="sep"></span>41s</span></div>
+              <ol class="beats">
+                <li class="beat agent move">
+                  <div class="who"><span class="actor"><span class="amark"><svg><use href="#agent"/></svg></span>Agent</span><time>12:10</time></div>
+                  <div class="what"><div class="bh">Moved on with <code>opened</code> <span class="arrow">→</span> <code>await_review</code></div>
+                    <div class="clamp"><p>Opened PR #214 from fix/flaky-inbox-toast against main. 3 commits, 212 tests green.</p></div>
+                    <dl class="kv inset"><div><dt>pr_url</dt><dd class="code">https://github.com/backnotprop/plannotator/pull/214</dd></div><div><dt>commits</dt><dd class="code">3</dd></div><div><dt>base</dt><dd class="code">main</dd></div></dl>
+                  </div>
+                </li>
+                <li class="beat agent cred">
+                  <div class="who"><span class="actor"><span class="amark"><svg><use href="#agent"/></svg></span>Agent</span><time>12:09</time></div>
+                  <div class="what"><div class="bh">Used GitHub <span class="sep"></span> michael for <code>gh pr create</code></div><p class="bq">Leased to the command on michael's laptop<span class="sep"></span>slot <code>github</code><span class="sep"></span>the token stayed out of the model's context</p></div>
+                </li>
+              </ol>
+            </li>
+            <li class="chapter">
+              <div class="ch-h"><svg class="block t-none" width="10" height="10"><use href="#blk"/></svg><span class="ch-t">Run the full test suite</span><code>verify</code><span class="ch-m">12:07<span class="sep"></span>1m 50s</span></div>
+              <ol class="beats">
+                <li class="beat agent move">
+                  <div class="who"><span class="actor"><span class="amark"><svg><use href="#agent"/></svg></span>Agent</span><time>12:09</time></div>
+                  <div class="what"><div class="bh">Moved on with <code>passed</code> <span class="arrow">→</span> <code>open_pr</code></div>
+                    <dl class="kv inset"><div><dt>command</dt><dd class="code">bun test</dd></div><div><dt>passed</dt><dd class="code">212</dd></div><div><dt>failed</dt><dd class="code">0</dd></div></dl>
+                  </div>
+                </li>
+              </ol>
+            </li>
+            <li class="chapter">
+              <div class="ch-h"><svg class="block t-none" width="10" height="10"><use href="#blk"/></svg><span class="ch-t">Fix the bug</span><code>fix</code><span class="ch-m">12:04<span class="sep"></span>3m 12s</span></div>
+              <ol class="beats">
+                <li class="beat agent move">
+                  <div class="who"><span class="actor"><span class="amark"><svg><use href="#agent"/></svg></span>Agent</span><time>12:07</time></div>
+                  <div class="what"><div class="bh">Moved on with <code>fixed</code> <span class="arrow">→</span> <code>verify</code></div><div class="clamp"><p>Replaced the toast's setTimeout with the inbox store's clock; added a regression test that opens the reply box mid-toast.</p></div></div>
+                </li>
+                <li class="beat them">
+                  <div class="who"><span class="actor">Dana</span><time>12:05</time></div>
+                  <div class="what"><div class="bh">Dana unblocked it</div><p><q class="quote">Use the store clock, not a timer. There is a helper in inbox/clock.ts.</q></p></div>
+                </li>
+                <li class="beat agent stop" data-tone="blocked">
+                  <div class="who"><span class="actor"><span class="amark"><svg><use href="#agent"/></svg></span>Agent</span><time>12:04</time></div>
+                  <div class="what"><div class="bh"><svg class="block t-blocked" width="9" height="9"><use href="#blk"/></svg>Blocked <code>ambiguous-fix</code></div>
+                    <ol class="needs small"><li><span class="count">1</span><p>Two fixes are possible: a longer timer, or tying the toast to the store's clock. Which one do you want?</p></li></ol></div>
+                </li>
+              </ol>
+            </li>
+            <li class="chapter">
+              <div class="ch-h"><svg class="block t-none" width="10" height="10"><use href="#blk"/></svg><span class="ch-t">Reproduce the bug</span><code>reproduce</code><span class="ch-m">12:03<span class="sep"></span>58s</span></div>
+              <ol class="beats">
+                <li class="beat agent move"><div class="who"><span class="actor"><span class="amark"><svg><use href="#agent"/></svg></span>Agent</span><time>12:04</time></div><div class="what"><div class="bh">Moved on with <code>reproduced</code> <span class="arrow">→</span> <code>fix</code></div></div></li>
+                <li class="beat agent"><div class="who"><span class="actor"><span class="amark"><svg><use href="#agent"/></svg></span>Agent</span><time>12:03</time></div><div class="what"><div class="bh">Started the run</div></div></li>
+              </ol>
+            </li>
+          </ol>
+        </section>
+
+        <aside class="facts">
+          <section><h3 class="section-h">Inputs</h3>
+            <dl class="kv stacked"><div><dt class="lbl">issue_url</dt><dd class="code">https://github.com/backnotprop/plannotator/issues/2003</dd></div><div><dt class="lbl">repo_path</dt><dd class="code">/work/plannotator</dd></div></dl>
+          </section>
+          <section><h3 class="section-h">Checks</h3>
+            <ul class="checks">
+              <li><svg class="block t-check" width="9" height="9"><use href="#blk"/></svg><div><code>clean-tree</code><span class="cw">passed</span><p>git status --porcelain printed nothing.</p></div></li>
+              <li><svg class="block t-check" width="9" height="9"><use href="#blk"/></svg><div><code>tests-run</code><span class="cw">passed</span><p>bun test starts and finishes in 1m 40s.</p></div></li>
+            </ul>
+          </section>
+          <section><h3 class="section-h">Credentials</h3>
+            <dl class="kv stacked"><div><dt class="lbl">github</dt><dd>GitHub <span class="sep"></span> michael<span class="sep"></span><span class="dim">1 use, 12:09</span></dd></div></dl>
+          </section>
+          <section><h3 class="section-h">Run</h3>
+            <div class="fact-agent"><span class="amark tile"><svg><use href="#agent"/></svg></span><span><span class="fa-n">Claude Code</span><span class="fa-s">started by michael · key laptop</span></span></div>
+            <dl class="kv stacked"><div><dt class="lbl">Run</dt><dd class="code">run_k3m9x2pq</dd></div><div><dt class="lbl">Machine</dt><dd class="code">ship-fix v2</dd></div><div><dt class="lbl">Started</dt><dd>Oct 20, 12:03</dd></div><div><dt class="lbl">Updated</dt><dd>4m ago</dd></div></dl>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </main>
+</section>
+
+<script>
+  // Tabs only: show one screen at a time.
+  const tabs = document.querySelectorAll(".chrome .t"), mocks = document.querySelectorAll(".mock");
+  const go = (id) => { tabs.forEach((t) => t.classList.toggle("on", t.dataset.go === id)); mocks.forEach((m) => m.classList.toggle("on", m.dataset.screen === id)); location.hash = id; window.scrollTo(0, 0); };
+  tabs.forEach((t) => t.addEventListener("click", () => go(t.dataset.go)));
+  if (location.hash && document.querySelector(`.mock[data-screen="${location.hash.slice(1)}"]`)) go(location.hash.slice(1));
+</script>
+</body>
+</html>

@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>machine · mock</title>
+<style>
+  :root{
+    --ground:#0d0d0d; --rule:#262626; --dim:#3a3a3a; --muted:#6b6b6b; --text:#c9c9c9; --strong:#ededed;
+    --accent:#3b82f6; --accent-dim:#1f3f73;
+    --mono:"JetBrains Mono","IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--ground);color:var(--text);font:13px/1.6 var(--mono);-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  main{max-width:960px;margin:0 auto;padding:40px 24px 120px}
+  /* top line */
+  nav{display:flex;gap:24px;color:var(--muted);margin-bottom:40px;font-size:12px}
+  nav span{cursor:pointer}
+  nav span.on{color:var(--accent)}
+  nav .hint{margin-left:auto;color:var(--dim)}
+  /* frame */
+  .frame{position:relative;padding:20px 24px 16px;margin:0 0 40px}
+  .frame::before{content:"";position:absolute;inset:0;border:1px dashed var(--rule);border-radius:2px;pointer-events:none}
+  .frame>.title{position:absolute;top:-9px;left:0;right:0;text-align:center;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+  .frame>.title span{background:var(--ground);padding:0 12px}
+  .frame.sel::before{border-style:solid;border-color:var(--accent-dim)}
+  /* tables */
+  table{border-collapse:collapse;width:100%}
+  th{font-weight:400;color:var(--muted);text-align:left;padding:4px 0 8px;font-size:12px}
+  th.n,td.n{text-align:right}
+  thead tr{border-bottom:1px dashed var(--rule)}
+  td{padding:6px 0;vertical-align:top;white-space:nowrap}
+  td+td,th+th{padding-left:24px}
+  tr.row{cursor:pointer;color:var(--muted)}
+  tr.row.needs{color:var(--text)}
+  tr.row.sel{color:var(--strong)}
+  tr.row td:first-child::before{content:"  ";display:inline-block;width:14px;color:var(--accent)}
+  tr.row.needs td:first-child::before{content:"—"}
+  tr.row.sel td:first-child::before{content:"▸"}
+  .dimmed{color:var(--dim)}
+  /* now card */
+  .now h1{font-size:15px;font-weight:500;color:var(--strong);margin:0 0 4px}
+  .now .kind{color:var(--muted);font-size:12px;margin-bottom:16px}
+  .now p{margin:0 0 16px;max-width:72ch}
+  .kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 24px;margin:0 0 16px}
+  .kv .k{color:var(--muted)}
+  .events{display:flex;gap:16px;flex-wrap:wrap}
+  .ev{color:var(--muted)}
+  .ev.human{color:var(--accent);cursor:pointer;padding:2px 0}
+  .ev.human:active{transform:scale(.97)}
+  .ev .to{color:var(--dim)}
+  .needs li{list-style:none;padding:0;margin:0 0 4px}
+  .needs li::before{content:"[ ] ";color:var(--muted)}
+  .btn{color:var(--accent);cursor:pointer;display:inline-block;margin-top:12px}
+  .btn:active{transform:scale(.97)}
+  /* history */
+  .hist{margin:0;padding:0;list-style:none}
+  .hist li{display:grid;grid-template-columns:52px 1fr;gap:0 16px;color:var(--muted);padding:3px 0}
+  .hist li .t{color:var(--dim)}
+  .hist li.last{color:var(--text)}
+  .hist li .pl{color:var(--dim);white-space:pre-wrap}
+  .hist li.last .pl{color:var(--muted)}
+  .hist li.human .ev{color:var(--accent)}
+  /* graph */
+  .graph{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  svg{display:block;width:100%;height:auto}
+  .node{fill:none;stroke:var(--rule)}
+  .node.on{stroke:var(--accent)}
+  .lbl{fill:var(--dim);font:12px var(--mono)}
+  .lbl.path{fill:var(--text)}
+  .lbl.on{fill:var(--strong)}
+  .edge{stroke:var(--rule);fill:none}
+  .edge.path{stroke:var(--muted)}
+  .edge.human{stroke-dasharray:4 4}
+  .elbl{fill:var(--dim);font:11px var(--mono)}
+  .elbl.path{fill:var(--muted)}
+  /* editor */
+  .ed{display:grid;grid-template-columns:1.2fr 1fr;gap:40px}
+  .blk{padding:8px 0 8px 16px;border-left:1px solid transparent;color:var(--muted);cursor:pointer}
+  .blk .id{color:var(--muted)}
+  .blk .body{display:none;margin-top:8px}
+  .blk.sel{color:var(--text);border-left-color:var(--accent)}
+  .blk.sel .id{color:var(--strong)}
+  .blk.sel .body{display:block}
+  .blk .k{color:var(--muted)}
+  .blk textarea,.blk input{background:transparent;border:0;color:var(--text);font:inherit;width:100%;resize:vertical;padding:0;outline:none}
+  .blk textarea:focus,.blk input:focus{color:var(--strong)}
+  .blk .ln{margin:6px 0}
+  .field{display:grid;grid-template-columns:120px 1fr;gap:12px;margin:2px 0}
+  .problems{color:var(--muted);font-size:12px;margin-top:24px}
+  .problems span{color:var(--accent);cursor:pointer}
+  .screen{display:none}.screen.on{display:block}
+  .skill{white-space:pre-wrap;color:var(--muted);font-size:12px;line-height:1.5}
+  .skill b{color:var(--text);font-weight:400}
+</style>
+</head>
+<body>
+<main>
+<nav>
+  <span class="on" data-s="runs">runs</span>
+  <span data-s="run">run</span>
+  <span data-s="machine">machine</span>
+  <span class="hint">1 2 3 switch · j k move · esc back</span>
+</nav>
+
+<!-- ============ RUNS ============ -->
+<section class="screen on" id="runs">
+  <div class="frame"><div class="title"><span>runs</span></div>
+    <table>
+      <thead><tr><th>machine</th><th>status</th><th>state</th><th>needs</th><th class="n">since</th></tr></thead>
+      <tbody id="runrows">
+        <tr class="row needs sel" data-run="r1"><td>ship-fix</td><td>waiting</td><td>await_review</td><td>your decision · pull/412</td><td class="n">4m</td></tr>
+        <tr class="row needs" data-run="r2"><td>ship-fix</td><td>blocked</td><td>reproduce</td><td>gh is not logged in</td><td class="n">1h</td></tr>
+        <tr class="row" data-run="r3"><td>changelog-draft</td><td>running</td><td>draft</td><td class="dimmed">writing entry · 40%</td><td class="n">30s</td></tr>
+        <tr class="row" data-run="r4"><td>changelog-draft</td><td>succeeded</td><td>ready</td><td class="dimmed">—</td><td class="n">2h</td></tr>
+        <tr class="row" data-run="r5"><td>ship-fix</td><td>succeeded</td><td>merged</td><td class="dimmed">—</td><td class="n">1d</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="dimmed" style="font-size:12px">enter opens the run in place · n new run · m machines</div>
+</section>
+
+<!-- ============ RUN ============ -->
+<section class="screen" id="run">
+  <div class="dimmed" style="font-size:12px;margin-bottom:20px">ship-fix · run_a91k · v1 · started 14:02 by claude-code</div>
+
+  <div class="frame sel now"><div class="title"><span>now</span></div>
+    <h1>wait for human review</h1>
+    <div class="kind">await_review · waiting · your move</div>
+    <p>the agent opened the pull request and stopped. choose what happens next.</p>
+    <div class="kv">
+      <div class="k">pr</div><div>github.com/acme/app/pull/412</div>
+      <div class="k">branch</div><div>fix/date-parse</div>
+      <div class="k">verified</div><div>bun test · pass</div>
+    </div>
+    <div class="events">
+      <span class="ev human">[ approved ] <span class="to">→ merged</span></span>
+      <span class="ev human">[ changes_requested ] <span class="to">→ fix</span></span>
+    </div>
+  </div>
+
+  <div class="frame"><div class="title"><span>history</span></div>
+    <ul class="hist">
+      <li><span class="t">14:02</span><span>begin → reproduce<div class="pl">clean-tree ok · gh-auth ok · tests-run ok</div></span></li>
+      <li><span class="t">14:06</span><span>note<div class="pl">reading the issue, writing a failing test · 20%</div></span></li>
+      <li><span class="t">14:11</span><span>reproduced → fix<div class="pl">repro   bun test date-parse
+summary off by one in parseDate when the month is december</div></span></li>
+      <li><span class="t">14:14</span><span>note<div class="pl">culprit in util/date.ts, month index · 60%</div></span></li>
+      <li><span class="t">14:19</span><span>fixed → verify<div class="pl">branch        fix/date-parse
+files_changed util/date.ts, util/date.test.ts</div></span></li>
+      <li><span class="t">14:21</span><span>fail → fix<div class="pl">command bun test
+result  fail
+failing format.test.ts › pads the year</div></span></li>
+      <li><span class="t">14:24</span><span>fixed → verify<div class="pl">branch        fix/date-parse
+files_changed util/date.ts, util/date.test.ts, util/format.ts</div></span></li>
+      <li><span class="t">14:26</span><span>pass → open_pr<div class="pl">command bun test
+result  pass</div></span></li>
+      <li class="last"><span class="t">14:28</span><span>opened → await_review<div class="pl">pr_url github.com/acme/app/pull/412</div></span></li>
+    </ul>
+  </div>
+
+  <div class="frame"><div class="title"><span>machine</span></div>
+    <svg viewBox="0 -5 900 190">
+      <g class="edges">
+        <path class="edge path" d="M150,40 L200,40"/>
+        <path class="edge path" d="M350,40 L400,40"/>
+        <path class="edge path" d="M550,40 L600,40"/>
+        <path class="edge path" d="M675,60 L675,120"/>
+        <path class="edge path" d="M475,60 C475,100 275,100 275,60"/>
+        <path class="edge human" d="M750,140 L800,140"/>
+        <path class="edge human" d="M600,140 C500,140 450,80 400,55"/>
+        <path class="edge" d="M75,60 L75,120"/>
+        <path class="edge human" d="M150,140 L200,140"/>
+        <path class="edge human" d="M60,120 L60,60"/>
+      </g>
+      <g class="nodes">
+        <rect class="node" x="0" y="20" width="150" height="40" rx="4"/><text class="lbl path" x="75" y="44" text-anchor="middle">reproduce</text>
+        <rect class="node" x="200" y="20" width="150" height="40" rx="4"/><text class="lbl path" x="275" y="44" text-anchor="middle">fix</text>
+        <rect class="node" x="400" y="20" width="150" height="40" rx="4"/><text class="lbl path" x="475" y="44" text-anchor="middle">verify</text>
+        <rect class="node" x="600" y="20" width="150" height="40" rx="4"/><text class="lbl path" x="675" y="44" text-anchor="middle">open_pr</text>
+        <rect class="node on" x="600" y="120" width="150" height="40" rx="4"/><text class="lbl on" x="675" y="144" text-anchor="middle">await_review</text>
+        <rect class="node" x="800" y="120" width="100" height="40" rx="20"/><text class="lbl" x="850" y="144" text-anchor="middle">merged</text>
+        <rect class="node" x="0" y="120" width="150" height="40" rx="4"/><text class="lbl" x="75" y="144" text-anchor="middle">needs_info</text>
+        <rect class="node" x="200" y="120" width="130" height="40" rx="20"/><text class="lbl" x="265" y="144" text-anchor="middle">abandoned</text>
+      </g>
+      <g>
+        <text class="elbl path" x="175" y="12" text-anchor="middle">reproduced</text>
+        <text class="elbl path" x="375" y="12" text-anchor="middle">fixed</text>
+        <text class="elbl path" x="575" y="12" text-anchor="middle">pass</text>
+        <text class="elbl path" x="375" y="100" text-anchor="middle">fail</text>
+        <text class="elbl path" x="685" y="95">opened</text>
+        <text class="elbl" x="775" y="112" text-anchor="middle">approved</text>
+        <text class="elbl" x="470" y="128" text-anchor="middle">changes_requested</text>
+        <text class="elbl" x="85" y="95">cannot_reproduce</text>
+        <text class="elbl" x="175" y="112" text-anchor="middle">wont_fix</text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<!-- ============ MACHINE ============ -->
+<section class="screen" id="machine">
+  <div class="dimmed" style="font-size:12px;margin-bottom:20px">ship-fix · v1 · draft has 2 problems · <span style="color:var(--muted)">publish</span> · <span style="color:var(--muted)">view skill</span></div>
+  <div class="ed">
+    <div id="blocks">
+      <div class="blk" data-i="0"><span class="id">inputs</span> <span class="k">issue_url, repo_path, base_branch</span>
+        <div class="body">
+          <div class="field"><span class="k">issue_url</span><input value="string · required · link to the bug report"></div>
+          <div class="field"><span class="k">repo_path</span><input value="string · required · absolute path to the checkout"></div>
+          <div class="field"><span class="k">base_branch</span><input value="string · branch to open the PR against (default main)"></div>
+        </div></div>
+      <div class="blk" data-i="1"><span class="id">requirements</span> <span class="k">clean-tree, gh-auth, tests-run</span>
+        <div class="body">
+          <div class="field"><span class="k">clean-tree</span><input value="git status --porcelain prints nothing"></div>
+          <div class="field"><span class="k">gh-auth</span><input value="gh auth status exits 0"></div>
+          <div class="field"><span class="k">tests-run</span><input value="the test command starts and finishes"></div>
+        </div></div>
+      <div class="blk" data-i="2"><span class="id">reproduce</span> <span class="k">task · reproduced → fix · cannot_reproduce → needs_info</span>
+        <div class="body">
+          <div class="ln"><textarea rows="3">Read the issue. Write a failing test, or find a command, that demonstrates the bug on the current code. Do not change production code yet.</textarea></div>
+          <div class="field"><span class="k">report</span><div>repro · string · required<br>summary · string · required</div></div>
+          <div class="field"><span class="k">events</span><div>reproduced → fix<br>cannot_reproduce → needs_info</div></div>
+        </div></div>
+      <div class="blk sel" data-i="3"><span class="id">fix</span> <span class="k">task · fixed → verify</span>
+        <div class="body">
+          <div class="ln"><textarea rows="3">Make the smallest change that fixes the cause, not the symptom. Keep the reproduction test. Commit on a branch named fix/&lt;short-slug&gt;.</textarea></div>
+          <div class="field"><span class="k">report</span><div>branch · string · required<br>files_changed · array · required</div></div>
+          <div class="field"><span class="k">events</span><div>fixed → verify</div></div>
+        </div></div>
+      <div class="blk" data-i="4"><span class="id">verify</span> <span class="k">decision · pass → open_pr · fail → fix</span>
+        <div class="body">
+          <div class="ln"><textarea rows="2">Run the whole suite, not just the new test. Report the exact command and result.</textarea></div>
+          <div class="field"><span class="k">report</span><div>command · string · required<br>result · pass | fail · required<br>failing · array</div></div>
+          <div class="field"><span class="k">events</span><div>pass → open_pr<br>fail → fix</div></div>
+        </div></div>
+      <div class="blk" data-i="5"><span class="id">open_pr</span> <span class="k">task · opened → review</span>
+        <div class="body">
+          <div class="ln"><textarea rows="2">Push the branch and open a PR against base_branch with gh pr create.</textarea></div>
+          <div class="field"><span class="k">report</span><div>pr_url · string · required</div></div>
+          <div class="field"><span class="k">events</span><div>opened → review <span style="color:var(--accent)">unknown state</span></div></div>
+        </div></div>
+      <div class="blk" data-i="6"><span class="id">await_review</span> <span class="k">wait · approved → merged · changes_requested → fix</span>
+        <div class="body"><div class="field"><span class="k">events</span><div>approved → merged (human)<br>changes_requested → fix (human)</div></div></div></div>
+      <div class="blk" data-i="7"><span class="id">needs_info</span> <span class="k">wait · info_provided → reproduce · wont_fix → abandoned</span>
+        <div class="body"><div class="field"><span class="k">events</span><div>info_provided → reproduce (human)<br>wont_fix → abandoned (human)</div></div></div></div>
+      <div class="blk" data-i="8"><span class="id">merged</span> <span class="k">final · <span style="color:var(--accent)">needs an outcome</span></span>
+        <div class="body"><div class="field"><span class="k">outcome</span><input value=""></div></div></div>
+      <div class="blk" data-i="9"><span class="id">abandoned</span> <span class="k">final · failure</span>
+        <div class="body"><div class="field"><span class="k">outcome</span><input value="failure"></div></div></div>
+      <div class="problems">2 problems · <span>open_pr → unknown state "review"</span> · <span>merged needs an outcome</span></div>
+    </div>
+    <div>
+      <div class="frame"><div class="title"><span>graph</span></div>
+        <svg viewBox="0 0 420 420">
+          <g class="edges">
+            <path class="edge" d="M110,50 L110,80"/>
+            <path class="edge" d="M110,130 L110,160"/>
+            <path class="edge" d="M110,210 L110,240"/>
+            <path class="edge" d="M110,290 L110,320"/>
+            <path class="edge" d="M160,185 C230,185 230,105 160,105"/>
+            <path class="edge human" d="M160,345 C300,345 300,105 160,105"/>
+            <path class="edge human" d="M160,340 L260,340"/>
+            <path class="edge" d="M60,50 C20,50 20,240 60,240"/>
+            <path class="edge human" d="M60,265 C20,265 20,50 60,50"/>
+            <path class="edge human" d="M160,265 L260,265"/>
+          </g>
+          <g class="nodes">
+            <rect class="node" x="60" y="20" width="100" height="30" rx="4"/><text class="lbl path" x="110" y="39" text-anchor="middle">reproduce</text>
+            <rect class="node on" x="60" y="80" width="100" height="30" rx="4"/><text class="lbl on" x="110" y="99" text-anchor="middle">fix</text>
+            <rect class="node" x="60" y="160" width="100" height="30" rx="4"/><text class="lbl path" x="110" y="179" text-anchor="middle">verify</text>
+            <rect class="node" x="60" y="240" width="100" height="30" rx="4"/><text class="lbl path" x="110" y="259" text-anchor="middle">open_pr</text>
+            <rect class="node" x="60" y="320" width="100" height="30" rx="4"/><text class="lbl" x="110" y="339" text-anchor="middle">await_review</text>
+            <rect class="node" x="260" y="325" width="100" height="30" rx="15"/><text class="lbl" x="310" y="344" text-anchor="middle">merged</text>
+            <rect class="node" x="260" y="250" width="100" height="30" rx="4" stroke-dasharray="3 3"/><text class="lbl" x="310" y="269" text-anchor="middle">review ?</text>
+            <rect class="node" x="260" y="20" width="100" height="30" rx="4"/><text class="lbl" x="310" y="39" text-anchor="middle">needs_info</text>
+            <rect class="node" x="260" y="80" width="100" height="30" rx="15"/><text class="lbl" x="310" y="99" text-anchor="middle">abandoned</text>
+          </g>
+          <g>
+            <text class="elbl" x="118" y="70">reproduced</text>
+            <text class="elbl" x="118" y="150">fixed</text>
+            <text class="elbl" x="118" y="230">pass</text>
+            <text class="elbl" x="118" y="310">opened</text>
+            <text class="elbl" x="214" y="148" text-anchor="middle">fail</text>
+            <text class="elbl" x="300" y="200" text-anchor="middle">changes_requested</text>
+            <text class="elbl" x="210" y="332" text-anchor="middle">approved</text>
+          </g>
+        </svg>
+      </div>
+      <div class="dimmed" style="font-size:12px">auto layout · click a node to edit it · dashed = human</div>
+    </div>
+  </div>
+</section>
+</main>
+<script>
+  const screens=[...document.querySelectorAll('.screen')], tabs=[...document.querySelectorAll('nav span[data-s]')];
+  function show(id){screens.forEach(s=>s.classList.toggle('on',s.id===id));tabs.forEach(t=>t.classList.toggle('on',t.dataset.s===id));}
+  tabs.forEach(t=>t.onclick=()=>show(t.dataset.s));
+  if(location.hash&&document.getElementById(location.hash.slice(1)))show(location.hash.slice(1));
+  const rows=[...document.querySelectorAll('tr.row')]; let ri=0;
+  function selRow(i){ri=(i+rows.length)%rows.length;rows.forEach((r,k)=>r.classList.toggle('sel',k===ri));}
+  rows.forEach((r,k)=>r.onclick=()=>{selRow(k);show('run');});
+  const blks=[...document.querySelectorAll('.blk')]; let bi=3;
+  function selBlk(i){bi=(i+blks.length)%blks.length;blks.forEach((b,k)=>b.classList.toggle('sel',k===bi));}
+  blks.forEach((b,k)=>b.addEventListener('click',()=>selBlk(k)));
+  document.addEventListener('keydown',e=>{
+    if(e.target.matches('input,textarea')){if(e.key==='Escape')e.target.blur();return;}
+    const cur=screens.find(s=>s.classList.contains('on')).id;
+    if(e.key==='1')show('runs');if(e.key==='2')show('run');if(e.key==='3')show('machine');
+    if(cur==='runs'){if(e.key==='j')selRow(ri+1);if(e.key==='k')selRow(ri-1);if(e.key==='Enter')show('run');}
+    if(cur==='machine'){if(e.key==='j')selBlk(bi+1);if(e.key==='k')selBlk(bi-1);}
+    if(e.key==='Escape'&&cur!=='runs')show('runs');
+  });
+</script>
+</body>
+</html>

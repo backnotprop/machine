@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/run.schema.json",
+  "title": "Run",
+  "description": "One execution of a machine. Owned by the server; the agent only ever mutates it through the tool. The history is append-only and is what the UI renders.",
+  "type": "object",
+  "required": ["id", "machine", "status", "state", "inputs", "preflight", "history", "error", "created_at", "updated_at"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "machine": { "type": "object", "required": ["id", "version"], "properties": { "id": { "type": "string" }, "version": { "type": "integer" } } },
+    "status": { "enum": ["running", "waiting", "blocked", "succeeded", "failed", "cancelled"],
+      "description": "running: agent is working. waiting: a human must fire an event. blocked: agent reported it cannot proceed; a human must fix and unblock. succeeded/failed: reached a final state (or fatal fail). cancelled: human stopped it." },
+    "state": { "type": "string", "description": "Current state id" },
+    "inputs": { "type": "object" },
+    "preflight": { "type": "array", "items": { "type": "object", "required": ["id", "ok"], "properties": { "id": { "type": "string" }, "ok": { "type": "boolean" }, "detail": { "type": "string" } } } },
+    "history": { "type": "array", "items": { "$ref": "#/$defs/entry" } },
+    "error": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/error" }] },
+    "agent": { "type": "object", "properties": { "name": { "type": "string" }, "session": { "type": "string" } } },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "error": {
+      "type": "object", "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "description": "preflight_failed, or an agent-chosen snake_case code" },
+        "message": { "type": "string" },
+        "needs": { "type": "array", "items": { "type": "string" }, "description": "What a human must provide or fix; rendered as a checklist in the UI" }
+      }
+    },
+    "entry": {
+      "type": "object", "required": ["ts", "type", "actor"],
+      "properties": {
+        "ts": { "type": "string", "format": "date-time" },
+        "type": { "enum": ["begin", "transition", "note", "error", "rejected", "unblock", "cancel", "credential"] },
+        "actor": { "enum": ["agent", "human", "system"] },
+        "from": { "type": "string" }, "event": { "type": "string" }, "to": { "type": "string" },
+        "payload": { "description": "The state's output, validated against the definition" },
+        "note": { "type": "string" },
+        "progress": { "type": "number", "minimum": 0, "maximum": 100 },
+        "error": { "$ref": "#/$defs/error" },
+        "credential": { "type": "object", "required": ["id", "slot", "provider", "name"],
+          "properties": { "id": { "type": "string" }, "slot": { "type": "string" }, "provider": { "type": "string" }, "name": { "type": "string" }, "account": { "type": "string" } },
+          "description": "type credential: which stored credential a run used" },
+        "via": { "enum": ["lease", "proxy", "handoff"] },
+        "by": { "type": "string", "description": "member whose token asked" },
+        "command": { "type": "string", "description": "lease: program and subcommand of the child" },
+        "request": { "type": "string", "description": "proxy: METHOD /path" },
+        "exposed": { "type": "boolean", "description": "handoff: the agent received the raw value" }
+      }
+    }
+  }
+}

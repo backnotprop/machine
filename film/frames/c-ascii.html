@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="fonts.css">
+<style>
+  pre { position: absolute; margin: 0; font: 400 15px/19px var(--mono); color: var(--ink-2); white-space: pre; }
+  #word { left: 96px; top: 64px; font-size: 11px; line-height: 11px; letter-spacing: 0; color: var(--ink); }
+  #tag { left: 96px; top: 232px; font-size: 13px; letter-spacing: .3em; color: var(--blue-hi); }
+  #num { left: 1430px; top: 64px; font-size: 11px; line-height: 11px; color: var(--ink); text-align: right; }
+  #numcap { left: 1430px; top: 180px; font-size: 12px; letter-spacing: .25em; color: var(--ink-3); }
+  #rule { position: absolute; left: 96px; right: 96px; top: 292px; border-top: 1px solid var(--g); }
+  #diag { left: 96px; top: 326px; font-size: 16px; line-height: 21px; }
+  #diag b { color: var(--ink); font-weight: 500; } .lit { color: var(--blue-hi); } .w { color: var(--amber); } .r { color: var(--red); } .d { color: var(--ink-4); } .g { color: var(--green); } .k { color: var(--blue-hi); }
+  #runs { left: 96px; top: 640px; font-size: 15px; line-height: 22px; }
+  #runs b { color: var(--ink); font-weight: 500; }
+  #right { left: 1176px; top: 640px; font-size: 13px; line-height: 20px; color: var(--ink-3); }
+  #right b { color: var(--ink); font-weight: 500; }
+  #rule2 { position: absolute; left: 96px; right: 96px; bottom: 76px; border-top: 1px solid var(--g); }
+  #foot { left: 96px; top: 1016px; font-size: 12px; letter-spacing: .25em; color: var(--ink-4); }
+  #foot2 { left: 1360px; top: 1016px; font-size: 12px; letter-spacing: .25em; color: var(--ink-4); }
+  #grid { position: absolute; inset: 0; background-image: linear-gradient(to right, #ffffff05 1px, transparent 1px), linear-gradient(to bottom, #ffffff05 1px, transparent 1px); background-size: 96px 96px; background-position: 96px 64px; }
+</style></head><body><div id="stage"><div id="grid"></div>
+<pre id="word"></pre>
+<pre id="num"></pre><pre id="numcap">RUNS TODAY · LIVE</pre>
+<pre id="tag">STATE MACHINES FOR AGENTS  ·  THE SERVER ENFORCES  ·  THE AGENT DECIDES</pre>
+<div id="rule"></div>
+<pre id="diag"><b>release-plannotator</b>   <span class="d">rev c · run 8f2k · claude code</span>
+
+  ╔════════════╗   planned    ╔════════════╗    built     ╔════════════╗    pass     ╔════════════╗   opened    ╔════════════╗  approved   ╔════════════╗
+  ║    plan    ║ ───────────▶ ║   build    ║ ───────────▶ ║  ◇ test    ║ ──────────▶ ║  open_pr   ║ ──────────▶ <span class="w">║  ⌂ review  ║</span> ─ ─ ─ ─ ─ ▶ ║  ◉ merged  ║
+  ╚════════════╝       <span class="g">┃</span>      ╚════════════╝       <span class="g">┃</span>      ╚═════╤══════╝      <span class="g">┃</span>      ╚════════════╝      <span class="w">┃</span>      <span class="w">╚════════════╝</span>             ╚════════════╝
+                      <span class="g">✓</span>                           <span class="g">✓</span>            │             <span class="g">✓</span>            <span class="lit">■</span>              <span class="w">◌</span>  <span class="w">waiting on you · approve?</span>
+                                                                 └──────────── fail ────────────┘
+                                                                                       <span class="r">✗ "merge" is not an event of open_pr</span></pre>
+<pre id="runs"><b>runs</b>    <span class="d">this hour</span>
+
+<span class="lit">■</span> run_8f2k    plan <span class="g">✓</span>  build <span class="g">✓</span>  test <span class="g">✓</span>  open_pr <span class="g">✓</span>  review <span class="w">◌</span>           <span class="d">0:14:02</span>
+<span class="lit">■</span> run_7c1d    plan <span class="g">✓</span>  build <span class="g">✓</span>  test <span class="r">✗</span>  build <span class="g">✓</span>  test <span class="g">✓</span>  open_pr <span class="lit">■</span>  <span class="d">0:09:41</span>
+<span class="lit">■</span> run_6b90    plan <span class="g">✓</span>  build <span class="lit">■</span>                                      <span class="d">0:01:12</span>
+  run_5a44    plan <span class="g">✓</span>  build <span class="g">✓</span>  test <span class="g">✓</span>  open_pr <span class="g">✓</span>  review <span class="g">✓</span>  merged <span class="g">◉</span>  <span class="d">done</span>
+  run_4e07    plan <span class="g">✓</span>  build <span class="g">✓</span>  test <span class="g">✓</span>  open_pr <span class="g">✓</span>  review <span class="r">✗</span>  fix <span class="g">✓</span>     <span class="d">done</span></pre>
+<pre id="right"><b>SKILL.md</b>   <span class="k">release-plannotator</span>
+
+<b>begin</b>        inputs, preflight      → the first state card
+<b>transition</b>   run_id, event, payload → the next card, or what was rejected
+<b>fail</b>         run_id, code, needs    → the card, now blocked
+
+Fire only events on the current card. Anything else is <span class="r">rejected</span>.
+A <span class="w">wait</span> state holds until a person decides.
+Every move is a tool call. Every run is kept.
+
+<b>mcp</b>          http://localhost:7420/mcp
+<b>agents</b>       claude code · codex · gemini · opencode
+
+<span class="g">determinism</span>  where you need it
+<span class="k">emergence</span>    where agents shine</pre>
+<div id="rule2"></div>
+<pre id="foot">MACHINE · 2026 · SHEET 01/01</pre>
+<pre id="foot2">EVERY MOVE CHECKED · EVERY RUN KEPT</pre>
+<script>
+// The wordmark and the figure are the real typeface rasterised to a character grid: Geist Sans 600 drawn to an offscreen
+// canvas, sampled at the cell size, printed in half-blocks (▀ ▄ █) so each character row carries two pixel rows.
+async function raster(text, font, cols, cellW, cellH, el) {
+  await document.fonts.load(font);
+  const cv = document.createElement('canvas'); const g = cv.getContext('2d');
+  g.font = font; const w = Math.ceil(g.measureText(text).width) + 8, h = Math.ceil(parseInt(font.match(/(\d+)px/)[1]) * 1.1);
+  cv.width = w; cv.height = h; g.font = font; g.fillStyle = '#fff'; g.textBaseline = 'alphabetic'; g.fillText(text, 4, h * .82);
+  const d = g.getImageData(0, 0, w, h).data, C = Math.ceil(w / cellW), R = Math.ceil(h / cellH);
+  const at = (cx, cy) => { let s = 0, n = 0; for (let y = Math.floor(cy * cellH); y < Math.floor((cy + 1) * cellH) && y < h; y++) for (let x = Math.floor(cx * cellW); x < Math.floor((cx + 1) * cellW) && x < w; x++) { s += d[(y * w + x) * 4 + 3]; n++; } return n ? s / n / 255 : 0; };
+  const lines = [];
+  for (let r = 0; r < R; r += 2) { let line = ''; for (let c = 0; c < C; c++) { const a = at(c, r) > .5, b = at(c, r + 1) > .5; line += a && b ? '█' : a ? '▀' : b ? '▄' : ' '; } lines.push(line.replace(/\s+$/, '')); }
+  while (lines.length && !lines[0]) lines.shift(); while (lines.length && !lines[lines.length - 1]) lines.pop();
+  el.textContent = lines.join('\n');
+}
+raster('machine', '600 150px "Geist Sans"', 0, 6.6, 5.5, document.getElementById('word'));
+raster('1,284', '600 96px "Geist Mono"', 0, 6.6, 5.5, document.getElementById('num')).then(() => { const el = document.getElementById('num'); el.style.left = (1824 - el.getBoundingClientRect().width) + 'px'; const cap = document.getElementById('numcap'); cap.style.left = (1824 - cap.getBoundingClientRect().width) + 'px'; });
+</script>
+</div></body></html>

@@ -1,0 +1,42 @@
+{
+  "runs": {
+    "textRuns": 55,
+    "graphLabels": 0,
+    "controls": 7,
+    "typeStyles": 9,
+    "textColours": 3,
+    "borderedBoxes": 9
+  },
+  "run-blocked": {
+    "textRuns": 45,
+    "graphLabels": 32,
+    "controls": 6,
+    "typeStyles": 10,
+    "textColours": 4,
+    "borderedBoxes": 13
+  },
+  "run-finished": {
+    "textRuns": 46,
+    "graphLabels": 32,
+    "controls": 4,
+    "typeStyles": 10,
+    "textColours": 3,
+    "borderedBoxes": 10
+  },
+  "machines": {
+    "textRuns": 44,
+    "graphLabels": 0,
+    "controls": 3,
+    "typeStyles": 9,
+    "textColours": 4,
+    "borderedBoxes": 3
+  },
+  "editor": {
+    "textRuns": 47,
+    "graphLabels": 22,
+    "controls": 10,
+    "typeStyles": 10,
+    "textColours": 4,
+    "borderedBoxes": 22
+  }
+}

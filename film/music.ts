@@ -1,0 +1,6 @@
+// bun film/music.ts [prompt] [ms] [out] → film/audio/music.mp3 (or out) (ElevenLabs Music). Key from video/.env.
+const env = Object.fromEntries((await Bun.file("video/.env").text()).split("\n").filter(l => l.includes("=")).map(l => l.split("=").map(s => s.trim())));
+const prompt = process.argv[2] ?? "Instrumental. A warm, driving synthwave factory groove at 100 bpm: deep analog bass pulse, soft side-chained pads, a tight muted kick, rounded square-wave arpeggio, tape saturation. Dark, confident, cinematic, like the menu music of a sleek automation video game. No vocals, no harsh hi-hats, no bright cymbals, no risers, no sound effects. Low-passed, smooth top end. Builds slightly over the first half, steady to the end.";
+const r = await fetch("https://api.elevenlabs.io/v1/music?output_format=mp3_44100_192", { method: "POST", headers: { "xi-api-key": env.ELEVENLABS_API_KEY, "content-type": "application/json" }, body: JSON.stringify({ prompt, music_length_ms: Number(process.argv[3] ?? 62000) }) });
+if (!r.ok) { console.error(r.status, await r.text()); process.exit(1); }
+const out = process.argv[4] ?? "film/audio/music.mp3"; await Bun.write(out, await r.arrayBuffer()); console.log(out);

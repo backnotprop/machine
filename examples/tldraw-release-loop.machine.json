@@ -1,0 +1,133 @@
+{
+  "id": "tldraw-release-loop",
+  "version": 1,
+  "name": "tldraw release loop",
+  "description": "One tick of the tldraw desktop release loop: when main has moved, gate it with pnpm check, dispatch the internal TestFlight build, and when something is red let a fixer open and land a PR, re-gate, and try again. A person is pulled in only when the loop stalls. Production promotion is a separate, manual tick.",
+  "inputs": {
+    "repo_path": { "type": "string", "required": true, "description": "Absolute path to the checkout, on main" },
+    "action": { "type": "string", "required": true, "enum": ["tick", "promote"], "description": "tick: process new commits on main. promote: promote the current internal build to production" },
+    "build_workflow": { "type": "string", "required": false, "description": "Workflow file that builds the internal TestFlight build, for `gh workflow run`. Default: the repo's internal build workflow" }
+  },
+  "requirements": [
+    { "id": "on-main", "description": "repo_path is on main with a clean tree", "check": "Run `git -C <repo_path> status --porcelain --branch`; ok if the first line starts with `## main` and nothing else prints" },
+    { "id": "pnpm-ready", "description": "pnpm runs and the repo has a `check` script", "check": "Run `pnpm --version` in repo_path and `grep '\"check\"' package.json`; ok if both print" },
+    { "id": "gh-ready", "description": "gh is logged in and can see the repository", "check": "Run `gh auth status` and `gh repo view --json nameWithOwner` in repo_path; ok if both succeed" }
+  ],
+  "initial": "start",
+  "states": {
+    "start": {
+      "kind": "decision",
+      "title": "Which tick is this",
+      "instructions": "Read the action input and fire the matching event. Nothing else.",
+      "on": {
+        "tick": { "to": "check", "description": "action = tick" },
+        "promote": { "to": "promotion", "description": "action = promote" }
+      }
+    },
+    "check": {
+      "kind": "task",
+      "title": "Waiting for new commits",
+      "instructions": "`git fetch origin` and `git pull --ff-only`. The last head this loop processed is in `.git/release-loop-last` (a bare SHA; absent on the first run, which means everything is new). Compare it with `origin/main`. Report the new commits with `machine.note`. Do not write the file yet; it is written when a tick ends in released.",
+      "output": {
+        "head": { "type": "string", "required": true, "description": "Short SHA of origin/main now" },
+        "new_commits": { "type": "number", "required": true }
+      },
+      "on": {
+        "new_commit": { "to": "gate", "description": "main moved since the last processed head" },
+        "nothing_new": { "to": "idle", "description": "main is where the last tick left it" }
+      }
+    },
+    "gate": {
+      "kind": "task",
+      "title": "Gate",
+      "instructions": "On main at head, run `pnpm check`. Green means exit 0. On red, keep the failing output; the fixer needs it. Do not fix anything here.",
+      "output": {
+        "head": { "type": "string", "required": true, "description": "Short SHA that was checked" },
+        "passed": { "type": "boolean", "required": true },
+        "failure": { "type": "string", "required": false, "description": "The first failing check and its key lines, when red" }
+      },
+      "on": {
+        "green": { "to": "dispatch" },
+        "red": { "to": "fix" }
+      }
+    },
+    "dispatch": {
+      "kind": "task",
+      "title": "TestFlight build",
+      "instructions": "Dispatch the internal build: `gh workflow run <build_workflow> --ref main`, then find the run (`gh run list --workflow=<build_workflow> --limit=1`) and watch it to the end, posting a note as jobs finish. Released means the workflow succeeded and the build reached internal TestFlight. If a job fails on the code (build or tests), fire build_failed with the failing lines. If the run never starts, hangs, or fails on infrastructure (runner, signing, upload), fire stalled; a fixer cannot help with that. When released, write the head SHA to `.git/release-loop-last`.",
+      "output": {
+        "run_id": { "type": "string", "required": true },
+        "result": { "type": "string", "required": true, "enum": ["released", "build_failed", "stalled"] },
+        "detail": { "type": "string", "required": false }
+      },
+      "on": {
+        "released": { "to": "released", "description": "Internal build is on TestFlight; .git/release-loop-last updated" },
+        "build_failed": { "to": "fix", "description": "Build or tests failed on the code" },
+        "stalled": { "to": "needs_person", "description": "Infrastructure failure or no progress" }
+      }
+    },
+    "fix": {
+      "kind": "task",
+      "title": "Fixer agent",
+      "instructions": "Branch from main as `huppy/release-fix-<head short SHA>`. Fix only what the gate or build reported, in the smallest change that makes it pass, with a test when one fits. Run `pnpm check` locally until it is green. Push the branch and open a PR with `gh pr create` whose body quotes the failure and says what changed. Do not merge here.",
+      "output": {
+        "branch": { "type": "string", "required": true },
+        "pr": { "type": "string", "required": true, "description": "PR number or URL" },
+        "summary": { "type": "string", "required": true }
+      },
+      "on": {
+        "pr_opened": { "to": "land" }
+      }
+    },
+    "land": {
+      "kind": "task",
+      "title": "Land fix",
+      "instructions": "Wait for the PR's checks (`gh pr checks <pr> --watch`). When every check is green and nothing blocks the merge, merge it (`gh pr merge <pr> --squash --delete-branch`), switch back to main and pull. If a check is red, the PR needs a human review, or a reviewer asked for changes, fire needs_review_or_red with the reason. If nothing has moved after a reasonable wait (about 30 minutes), fire timed_out.",
+      "output": {
+        "merged_sha": { "type": "string", "required": false, "description": "Short SHA of main after the merge" },
+        "reason": { "type": "string", "required": false, "description": "Why the fix did not land, when it did not" }
+      },
+      "on": {
+        "merged": { "to": "gate", "description": "Main moved; gate the new head" },
+        "needs_review_or_red": { "to": "needs_person" },
+        "timed_out": { "to": "needs_person" }
+      }
+    },
+    "needs_person": {
+      "kind": "wait",
+      "title": "Needs a person",
+      "instructions": "The loop is paused. Say in a note exactly what a person has to do (merge, review, fix the runner, decide) and where.",
+      "on": {
+        "clear_attention": { "to": "check", "actor": "human", "description": "The person handled it; look at main again" },
+        "stop": { "to": "stopped", "actor": "human", "description": "Stop the loop for now" }
+      }
+    },
+    "promotion": {
+      "kind": "task",
+      "title": "Production promotion",
+      "instructions": "Promote the current internal build to production the way the repo does it (its promote script or workflow). Record which build went out.",
+      "output": {
+        "build": { "type": "string", "required": true, "description": "Version or build number promoted" }
+      },
+      "on": {
+        "promoted": { "to": "verify" }
+      }
+    },
+    "verify": {
+      "kind": "task",
+      "title": "Verify production",
+      "instructions": "Confirm the production build is live and opens: the store or update feed shows the promoted build, and a fresh install or update launches to the main screen. Record what you checked.",
+      "output": {
+        "checks": { "type": "string", "required": true }
+      },
+      "on": {
+        "verified": { "to": "promoted" },
+        "broken": { "to": "needs_person" }
+      }
+    },
+    "idle": { "kind": "final", "title": "Nothing new on main", "outcome": "success" },
+    "released": { "kind": "final", "title": "Released to internal TestFlight", "outcome": "success" },
+    "promoted": { "kind": "final", "title": "Promoted to production and verified", "outcome": "success" },
+    "stopped": { "kind": "final", "title": "Loop stopped by a person", "outcome": "failure" }
+  }
+}

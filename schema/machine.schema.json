@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/machine.schema.json",
+  "title": "Machine definition",
+  "description": "A process an agent follows. Authored in the UI; the source of truth from which SKILL.md is rendered and against which runs are validated.",
+  "type": "object",
+  "required": [
+    "id",
+    "version",
+    "name",
+    "description",
+    "initial",
+    "states"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Stable kebab-case identifier; also the skill name"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bumped on every published edit; runs pin the version they started on"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string",
+      "description": "One or two sentences; becomes the skill description, so say when to use it"
+    },
+    "inputs": {
+      "$ref": "#/$defs/fields",
+      "description": "Parameters a run needs. Validated by the tool at preflight and begin."
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/requirement"
+      },
+      "description": "Preconditions the agent must check before begin"
+    },
+    "credentials": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/credential"
+      },
+      "description": "Slots the hosted server fills from the team's stored credentials; the agent never sees a value"
+    },
+    "initial": {
+      "type": "string",
+      "description": "Id of the starting state"
+    },
+    "states": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z0-9_]+$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/state"
+      }
+    }
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "array",
+            "object"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowed values (string fields)"
+        }
+      }
+    },
+    "fields": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "required": [
+        "id",
+        "description",
+        "check"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "description": {
+          "type": "string",
+          "description": "What must be true, in the human's words; shown in the UI when it fails"
+        },
+        "check": {
+          "type": "string",
+          "description": "How the agent verifies it: a command and the condition for ok"
+        },
+        "required": {
+          "type": "boolean",
+          "default": true,
+          "description": "If false, a failed check is recorded but does not block the run"
+        }
+      }
+    },
+    "credential": {
+      "type": "object",
+      "required": [
+        "id",
+        "provider"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "description": "Slot name the team binds a stored credential to; also the MACHINE_<SLOT>_* env prefix"
+        },
+        "provider": {
+          "type": "string",
+          "description": "Key of the provider catalog (src/engine/providers.ts): github, github-app, npm, aws, basic, http"
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "OAuth providers only"
+        },
+        "why": {
+          "type": "string",
+          "description": "Shown to the member on the Connect button"
+        },
+        "handoff": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the raw value may be handed to the agent (the credential tool)"
+        },
+        "base_url": {
+          "type": "string",
+          "description": "Providers without a fixed API (http, basic): where the request tool sends calls"
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "required": [
+        "to"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "to": {
+          "type": "string",
+          "description": "Target state id"
+        },
+        "description": {
+          "type": "string",
+          "description": "When the agent should fire this event (the guard, in words)"
+        },
+        "actor": {
+          "enum": [
+            "agent",
+            "human"
+          ],
+          "default": "agent",
+          "description": "Who may fire it. Human events are fired from the UI; required on wait states."
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "required": [
+        "kind",
+        "title"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "task",
+            "decision",
+            "wait",
+            "final"
+          ],
+          "description": "task: agent does work. decision: agent evaluates and picks an event. wait: a human picks the event. final: terminal."
+        },
+        "title": {
+          "type": "string"
+        },
+        "instructions": {
+          "type": "string",
+          "description": "Markdown the agent follows while in this state. Required for task states."
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/requirement"
+          },
+          "description": "Extra checks the agent performs on entering this state"
+        },
+        "credentials": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Slot ids live while the run is in this state. Absent: every slot."
+        },
+        "output": {
+          "$ref": "#/$defs/fields",
+          "description": "Payload the agent must supply on transition out of this state; validated by the tool"
+        },
+        "on": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/transition"
+          }
+        },
+        "outcome": {
+          "enum": [
+            "success",
+            "failure"
+          ],
+          "description": "Final states only"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "final"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "outcome"
+            ],
+            "not": {
+              "required": [
+                "on"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "task",
+                  "decision",
+                  "wait"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "on"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "task"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "instructions"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+import { chromium } from "playwright";
+const b = await chromium.launch({ channel: "chrome", args: ["--disable-gpu"] });
+const page = await b.newPage({ viewport: { width: 1280, height: 720 }, colorScheme: "dark" });
+await page.goto("http://localhost:7420/#/machines"); await page.waitForSelector(".seg");
+const theme = async () => page.evaluate(() => [document.documentElement.className, localStorage.getItem("theme"), getComputedStyle(document.body).backgroundColor]);
+console.log("os dark, system:", await theme());
+await page.screenshot({ path: "docs/design/shots/theme-system-dark.png" });
+await page.click('.bar-r .seg button:has-text("Light")'); await page.waitForTimeout(300);
+console.log("after Light:", await theme());
+await page.screenshot({ path: "docs/design/shots/theme-light.png" });
+await page.reload(); await page.waitForSelector(".seg"); console.log("after reload:", await theme(), await page.$eval('.bar-r .seg .on', e => e.textContent));
+await page.click('.bar-r .seg button:has-text("Dark")'); await page.waitForTimeout(300); console.log("after Dark:", await theme());
+await page.click('.bar-r .seg button:has-text("System")'); await page.waitForTimeout(300); console.log("after System:", await theme());
+await page.emulateMedia({ colorScheme: "light" }); await page.waitForTimeout(300); console.log("OS to light while System:", await theme());
+await page.screenshot({ path: "docs/design/shots/theme-system-light.png" });
+await b.close();

@@ -1,0 +1,12 @@
+import { chromium } from '/Users/ramos/oss/machine/node_modules/playwright/index.mjs';
+const OUT = '/Users/ramos/oss/machine/docs/brand/round3';
+const b = await chromium.launch({ channel: 'chrome', headless: true });
+const p = await b.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+const bad = []; p.on('request', r => { if (!r.url().startsWith('file://')) bad.push(r.url()); });
+await p.goto('file://' + OUT + '/index.html');
+await p.screenshot({ path: OUT + '/sheet.png', fullPage: true });
+const cards = await p.$$('.card');
+for (let i = 0; i < cards.length; i++) await cards[i].screenshot({ path: `/tmp/brand3/card-${i}.png` });
+await (await p.$('.verdict')).screenshot({ path: '/tmp/brand3/verdict.png' });
+console.log('cards', cards.length, 'external', bad.length, (await p.evaluate(() => document.body.scrollHeight)));
+await b.close();

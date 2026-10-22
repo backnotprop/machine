@@ -1,0 +1,107 @@
+{
+  "id": "code-review-loop",
+  "version": 1,
+  "name": "Code review loop",
+  "description": "Take a change from task to shipped through four checks: the author self-verifies, a second agent with no memory of the work reviews the diff, the automated checks run, and one decision sends it to ship, back to the author when the findings are resolvable, or to a person when something novel came up.",
+  "inputs": {
+    "repo_path": { "type": "string", "required": true, "description": "Absolute path to the git repository" },
+    "task": { "type": "string", "required": true, "description": "What to build or change, in plain words" },
+    "base_branch": { "type": "string", "required": false, "description": "Branch to start from and ship into. Default: main" }
+  },
+  "requirements": [
+    { "id": "clean-tree", "description": "repo_path is a git repository with a clean tree on the base branch", "check": "Run `git -C <repo_path> status --porcelain --branch`; ok if the first line names the base branch and nothing else prints" },
+    { "id": "checks-exist", "description": "The repo has automated checks to run (test, lint, typecheck or build scripts, or a CI config)", "check": "Look at package.json scripts, a Makefile, or .github/workflows; ok if at least one check command exists. Say which" }
+  ],
+  "initial": "generate",
+  "states": {
+    "generate": {
+      "kind": "task",
+      "title": "Agent generates code",
+      "instructions": "On the first pass, branch from the base branch with a short descriptive name and implement the task. On a later pass (back from all_clear or from a person), you are already on the branch: address every item in the list you were given and nothing else. Commit as you go with plain messages. Do not open a PR here.",
+      "output": {
+        "branch": { "type": "string", "required": true },
+        "files_changed": { "type": "number", "required": true },
+        "summary": { "type": "string", "required": true, "description": "What was done this pass, two lines at most" }
+      },
+      "on": {
+        "generated": { "to": "self_verify" }
+      }
+    },
+    "self_verify": {
+      "kind": "task",
+      "title": "Agent self-verifies",
+      "instructions": "Read your whole diff against the base branch as if someone else wrote it. Trace the logic, look for bugs, edge cases, duplication, dead code, and anything the task asked for that is missing. Fix what you find and commit. Report what you found, including nothing.",
+      "output": {
+        "issues_found": { "type": "number", "required": true },
+        "fixed": { "type": "string", "required": true, "description": "One line per issue fixed, or 'none'" }
+      },
+      "on": {
+        "verified": { "to": "second_review" }
+      }
+    },
+    "second_review": {
+      "kind": "task",
+      "title": "Second agent reviews",
+      "instructions": "Hand the diff and the task to a reviewer that has no memory of your work: a fresh agent (the Agent tool, or `claude -p` with the task and `git diff <base>...HEAD`). Ask for blocking issues and minor findings as a list, each with file and line. Do not fix anything in this state; record the findings verbatim.",
+      "output": {
+        "blocking": { "type": "number", "required": true },
+        "minor": { "type": "number", "required": true },
+        "findings": { "type": "array", "required": true, "description": "Every finding as the reviewer stated it" }
+      },
+      "on": {
+        "reviewed": { "to": "checks" }
+      }
+    },
+    "checks": {
+      "kind": "task",
+      "title": "Automated checks",
+      "instructions": "Run every check the repo has: tests, typecheck, lint, build. Record each command and whether it passed. Do not fix anything here.",
+      "output": {
+        "commands": { "type": "array", "required": true },
+        "passed": { "type": "boolean", "required": true, "description": "True only when every check passed" },
+        "failures": { "type": "string", "required": false }
+      },
+      "on": {
+        "checked": { "to": "all_clear" }
+      }
+    },
+    "all_clear": {
+      "kind": "decision",
+      "title": "All clear?",
+      "instructions": "Decide from the review findings and the checks. yes: no blocking findings, every check passed, minor findings either fixed or not worth a pass. resolvable: something is wrong, and you know what to do about it; write the list for the next generate pass. novel: a finding or failure that changes the task's shape, needs a product decision, or you could not understand; a person must look.",
+      "output": {
+        "verdict": { "type": "string", "required": true, "enum": ["yes", "resolvable", "novel"] },
+        "todo": { "type": "string", "required": false, "description": "The list for the next pass, or the question for the person" }
+      },
+      "on": {
+        "yes": { "to": "ship" },
+        "resolvable": { "to": "generate", "description": "Fix the list and come back through the checks" },
+        "novel": { "to": "human_review", "description": "A person decides" }
+      }
+    },
+    "human_review": {
+      "kind": "wait",
+      "title": "Human review",
+      "instructions": "Give the person what they need to decide: the diff, the findings, the checks and your question. Use the repo's review path (a Plannotator guided review, or a draft PR). Then stop.",
+      "on": {
+        "approved": { "to": "ship", "actor": "human" },
+        "changes_requested": { "to": "generate", "actor": "human", "description": "The person's notes become the next pass's list" },
+        "rejected": { "to": "abandoned", "actor": "human" }
+      }
+    },
+    "ship": {
+      "kind": "task",
+      "title": "Ship",
+      "instructions": "Push the branch and open a PR against the base branch with `gh pr create` (title from the task, body: summary, findings addressed, checks run). Merge it the way the repo does, or leave it open when the repo expects a person to merge; say which.",
+      "output": {
+        "pr": { "type": "string", "required": true, "description": "PR number or URL" },
+        "merged": { "type": "boolean", "required": true }
+      },
+      "on": {
+        "shipped": { "to": "shipped" }
+      }
+    },
+    "shipped": { "kind": "final", "title": "Shipped", "outcome": "success" },
+    "abandoned": { "kind": "final", "title": "Rejected by the person", "outcome": "failure" }
+  }
+}

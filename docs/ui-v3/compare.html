@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>machine v3: before and after</title>
+<style>
+@font-face { font-family: "Geist"; src: url(prototype/assets/geist-sans-latin-400-normal.woff2) format("woff2"); font-weight: 400; }
+@font-face { font-family: "Geist"; src: url(prototype/assets/geist-sans-latin-500-normal.woff2) format("woff2"); font-weight: 500; }
+body { margin: 0; background: #09090b; color: #ededef; font: 15px/1.6 "Geist", ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+main { max-width: 1680px; margin: 0 auto; padding: 56px 40px 96px; }
+h1 { font-size: 28px; font-weight: 500; letter-spacing: -.02em; margin: 0 0 8px; }
+.lede { color: #a1a1aa; max-width: 70ch; margin: 0 0 48px; }
+.lede a { color: #8db6fa; }
+section { margin: 0 0 64px; }
+h2 { font-size: 20px; font-weight: 500; margin: 0 0 6px; }
+.cap { color: #a1a1aa; margin: 0 0 18px; max-width: 110ch; }
+.cap b { color: #ededef; font-weight: 500; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+figure { margin: 0; }
+figure img { display: block; width: 100%; height: auto; border-radius: 14px; background: #111113; }
+figcaption { font-size: 13px; color: #8b8b94; margin-top: 10px; }
+.more { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+@media (max-width: 900px) { .pair, .more { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Before and after</h1>
+  <p class="lede">Left: the app at localhost:7420 today. Right: the v3 prototype with the same runs and machines. Both at 1440 by 900. Click through the prototype itself at <a href="prototype/index.html">prototype/index.html</a>; the reasons are in <a href="audit.md">audit.md</a> and <a href="direction.md">direction.md</a>.</p>
+
+  <section>
+    <h2>Runs</h2>
+    <p class="cap"><b>Before:</b> the blocked run is one row of five in a six-column table, with a filter, a keyboard hint and a second Machines button competing with it.<br><b>After:</b> the run that waits on you is a card at the top that says what it asks; finished runs are a quiet list of names and outcomes.</p>
+    <div class="pair"><figure><img src="before/runs.png" alt="Runs, before"><figcaption>before/runs.png</figcaption></figure><figure><img src="after/runs.png" alt="Runs, after"><figcaption>after/runs.png</figcaption></figure></div>
+  </section>
+
+  <section>
+    <h2>Run that is blocked</h2>
+    <p class="cap"><b>Before:</b> six lines of the agent's note come before the asks, the button says "I fixed it" to questions, and a 15-step graph with 32 tiny labels fills the right third.<br><b>After:</b> one column: where the run is, the two questions, a field for your answer and Resume, all in the first screen; history, map and inputs wait below.</p>
+    <div class="pair"><figure><img src="before/run-blocked.png" alt="Blocked run, before"><figcaption>before/run-blocked.png</figcaption></figure><figure><img src="after/run-blocked.png" alt="Blocked run, after"><figcaption>after/run-blocked.png</figcaption></figure></div>
+  </section>
+
+  <section>
+    <h2>Run that finished</h2>
+    <p class="cap"><b>Before:</b> the agent's summary is set in mono with words broken mid-word ("script s/install.sh"), next to the same always-open graph.<br><b>After:</b> the outcome and the last report; long values read as text, short ones stay mono.</p>
+    <div class="pair"><figure><img src="before/run-finished.png" alt="Finished run, before"><figcaption>before/run-finished.png</figcaption></figure><figure><img src="after/run-finished.png" alt="Finished run, after"><figcaption>after/run-finished.png</figcaption></figure></div>
+  </section>
+
+  <section>
+    <h2>Machines</h2>
+    <p class="cap"><b>Before:</b> a table where four-line descriptions set the row height, plus ids, versions and three number columns.<br><b>After:</b> one line per machine with the name, one line of description, when it last ran, and a waiting count only when there is one.</p>
+    <div class="pair"><figure><img src="before/machines.png" alt="Machines, before"><figcaption>before/machines.png</figcaption></figure><figure><img src="after/machines.png" alt="Machines, after"><figcaption>after/machines.png</figcaption></figure></div>
+  </section>
+
+  <section>
+    <h2>Machine editor</h2>
+    <p class="cap"><b>Before:</b> you land in a form for id, name and description, everything in mono, beside a full-weight graph with every edge labelled.<br><b>After:</b> the steps by title, nothing open; the map recedes and lights only the step you pick, and Publish appears when there is something to publish.</p>
+    <div class="pair"><figure><img src="before/editor.png" alt="Editor, before"><figcaption>before/editor.png</figcaption></figure><figure><img src="after/editor.png" alt="Editor, after"><figcaption>after/editor.png</figcaption></figure></div>
+  </section>
+
+  <section>
+    <h2>One step away</h2>
+    <p class="cap">What the prototype keeps folded until you ask: the history grouped by step, the map with the path taken lit, the run after you answer, and a step opened in the editor.</p>
+    <div class="more">
+      <figure><img src="after/run-blocked-history.png" alt="History open"><figcaption>History, one step open</figcaption></figure>
+      <figure><img src="after/run-blocked-map.png" alt="Map open"><figcaption>Map, path taken lit</figcaption></figure>
+      <figure><img src="after/run-resumed.png" alt="After resume"><figcaption>After you answer and resume</figcaption></figure>
+      <figure><img src="after/editor-step.png" alt="Editor with a step open"><figcaption>Editor, step picked on the map</figcaption></figure>
+    </div>
+  </section>
+</main>
+</body>
+</html>

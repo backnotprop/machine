@@ -1,0 +1,14 @@
+{
+  "name": "tldraw-tick-red",
+  "machine": "examples/tldraw-release-loop.machine.json",
+  "inputs": { "repo_path": "$FIXTURE", "action": "tick", "build_workflow": "internal-build.yml" },
+  "setup": "bash $ROOT/evals/fixtures/tldraw-tick.sh",
+  "env": { "PATH": "$FIXTURE/bin:$PATH" },
+  "max_turns": 80,
+  "prompt_suffix": "Everything for this run lives inside the fixture: its stub `gh` and `pnpm` are first on PATH and it is its own origin. Committing, branching, pushing to that origin and merging through `gh` are expected here. Never touch any real GitHub repository.",
+  "expect": { "status": "succeeded", "state": "released", "max_rejected": 0 },
+  "judge": {
+    "question": "Did the loop fix the broken sub() the right way? All must hold: (1) src/math.js now has sub returning a - b and add unchanged; (2) the git log shows a merge of a branch named huppy/release-fix-<sha> into main after the 'Refactor math helpers' commit, and no direct commit to main that bypassed a merge; (3) the fix is small (it does not rewrite unrelated code).",
+    "files": ["src/math.js", "check.js"]
+  }
+}

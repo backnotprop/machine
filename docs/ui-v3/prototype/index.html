@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>machine</title>
+<link rel="icon" href="assets/mark.svg">
+<style>
+@font-face { font-family: "Geist"; src: url(assets/geist-sans-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: block; }
+@font-face { font-family: "Geist"; src: url(assets/geist-sans-latin-500-normal.woff2) format("woff2"); font-weight: 500; font-display: block; }
+@font-face { font-family: "Geist Mono"; src: url(assets/geist-mono-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: block; }
+@font-face { font-family: "Geist Mono"; src: url(assets/geist-mono-latin-500-normal.woff2) format("woff2"); font-weight: 500; font-display: block; }
+
+:root {
+  /* surfaces: three soft layers, no borders between them */
+  --page: #09090b;        /* behind everything: the rail sits here */
+  --panel: #111113;       /* the content sheet */
+  --card: #18181b;        /* groups inside the sheet */
+  --well: #202024;        /* inputs, hover, selected rows */
+  --line: rgba(255,255,255,.06);
+  --lift: inset 0 1px 0 rgba(255,255,255,.035);  /* top-left light, as on the mark */
+
+  --text: #ededef;
+  --text-2: #a1a1aa;
+  --text-3: #8b8b94;
+
+  --accent: #3b82f6;      /* the lit block: the current thing */
+  --accent-text: #8db6fa;
+  --accent-tint: #131b2c; /* "your move" surface */
+  --accent-chip: #1a2847;
+
+  --ok: #4ccb8a; --warn: #e5a73b; --err: #ef6461; --idle: #6b6b74;
+
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --r-sheet: 22px; --r-card: 20px; --r-block: 14px; --r-control: 12px;
+  --ease-out: cubic-bezier(.23, 1, .32, 1);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--page); color: var(--text); font: 400 15px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button, input, textarea { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; border-radius: 8px; }
+[tabindex="-1"]:focus-visible { outline: none; }
+code { font: 12.5px var(--mono); color: var(--text); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 5px; }
+.mono { font-family: var(--mono); font-size: 12.5px; letter-spacing: 0; }
+.t2 { color: var(--text-2); } .t3 { color: var(--text-3); }
+.meta { font-size: 13px; line-height: 1.45; color: var(--text-3); }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* shell */
+.shell { display: grid; grid-template-columns: 232px 1fr; height: 100vh; }
+.rail { padding: 22px 14px 18px; display: flex; flex-direction: column; gap: 2px; }
+.brand { display: flex; align-items: center; gap: 11px; padding: 0 10px 26px; font-weight: 500; font-size: 15px; letter-spacing: -.01em; }
+.brand img { width: 26px; height: 26px; display: block; }
+.nav { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 12px; border-radius: var(--r-control); color: var(--text-2); transition: background-color .15s, color .15s; }
+.nav:hover { color: var(--text); background: var(--panel); }
+.nav[aria-current="page"] { color: var(--text); background: var(--card); box-shadow: var(--lift); }
+.count { min-width: 22px; height: 22px; padding: 0 7px; border-radius: 999px; background: var(--well); color: var(--text); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+.rail .foot { margin-top: auto; padding: 0 4px; }
+.keys-btn { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 10px; color: var(--text-3); font-size: 13px; }
+.keys-btn:hover { color: var(--text-2); background: var(--panel); }
+kbd { font: 500 12.5px var(--mono); min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px; background: var(--well); color: var(--text-2); display: inline-flex; align-items: center; justify-content: center; }
+
+.sheet { margin: 8px 8px 8px 0; background: var(--panel); border-radius: var(--r-sheet); overflow: auto; box-shadow: var(--lift); position: relative; }
+.page { margin: 0 auto; padding: 40px 48px 96px; }
+.page.narrow { max-width: 808px; }
+.page.wide { max-width: 1200px; }
+.enter { animation: enter .26s var(--ease-out) both; }
+@keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .enter { animation: fade .15s linear both; } @keyframes fade { from { opacity: 0; } to { opacity: 1; } } }
+
+/* page head */
+.crumbs { display: flex; justify-content: space-between; align-items: center; margin: 0 0 10px -8px; }
+.crumbs .back { margin: 0; }
+.back { display: inline-flex; align-items: center; gap: 6px; height: 28px; margin: 0 0 10px -8px; padding: 0 10px 0 6px; border-radius: 999px; color: var(--text-3); font-size: 13px; transition: background-color .15s, color .15s; }
+.back:hover { color: var(--text); background: var(--card); }
+.back svg { width: 14px; height: 14px; }
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
+h1 { font-size: 28px; line-height: 1.2; font-weight: 500; letter-spacing: -.02em; margin: 0; }
+.head .sub { margin-top: 8px; color: var(--text-3); font-size: 15px; line-height: 1.5; }
+.head .actions { display: flex; align-items: center; gap: 10px; flex: none; }
+h2.section { font-size: 13px; font-weight: 500; color: var(--text-3); margin: 0 0 12px; letter-spacing: 0; }
+h2.section.gap-l { margin-top: 44px; }
+
+/* controls */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: 999px; font-size: 15px; font-weight: 500; white-space: nowrap; transition: background-color .15s, color .15s, transform .12s var(--ease-out); }
+.btn:active { transform: scale(.96); }
+.btn.primary { background: var(--text); color: var(--page); }
+.btn.primary:hover { background: #fff; }
+.btn.soft { background: var(--well); color: var(--text); }
+.btn.soft:hover { background: #29292e; }
+.btn.quiet { color: var(--text-2); padding: 0 14px; }
+.btn.quiet:hover { color: var(--text); background: var(--well); }
+.btn.danger { background: rgba(239,100,97,.14); color: #f4a3a1; }
+.btn.small { height: 32px; padding: 0 14px; font-size: 13px; }
+.btn kbd { background: rgba(0,0,0,.08); color: inherit; opacity: .55; }
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--well); }
+.seg button { height: 30px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--text-3); transition: background-color .15s, color .15s; }
+.seg button[aria-pressed="true"] { background: #2e2e34; color: var(--text); }
+.seg button:hover { color: var(--text); }
+
+/* status: a dot and a word, never a coloured block */
+.status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); flex: none; }
+.dot.needs { background: var(--warn); } .dot.running { background: var(--accent); } .dot.ok { background: var(--ok); } .dot.fail { background: var(--err); }
+
+/* cards */
+.card { background: var(--card); border-radius: var(--r-card); box-shadow: var(--lift); }
+.card.pad { padding: 28px 30px; }
+
+/* runs: the inbox */
+.ask { display: block; background: var(--accent-tint); border-radius: var(--r-card); padding: 26px 28px 24px; box-shadow: var(--lift); transition: transform .2s var(--ease-out), background-color .2s; }
+.ask + .ask { margin-top: 12px; }
+.ask:hover { background: #15203a; }
+.ask .top { display: flex; justify-content: space-between; align-items: center; }
+.ask .who { font-size: 20px; font-weight: 500; letter-spacing: -.01em; margin: 12px 0 6px; }
+.ask .what { color: var(--text-2); max-width: 62ch; }
+.ask .need { margin-top: 14px; color: var(--text); max-width: 62ch; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ask .go { margin-top: 20px; display: flex; align-items: center; gap: 12px; }
+.kbd .ask.sel { outline: 2px solid rgba(141,182,250,.5); outline-offset: 3px; }
+.calm { background: var(--card); border-radius: var(--r-card); padding: 22px 28px; color: var(--text-2); box-shadow: var(--lift); }
+
+.list { background: var(--card); border-radius: var(--r-card); padding: 6px; box-shadow: var(--lift); }
+.row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; padding: 14px 18px; border-radius: var(--r-block); transition: background-color .12s; cursor: pointer; }
+.row:hover { background: var(--well); }
+.kbd .row.sel { background: var(--well); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
+.row .name { font-weight: 500; }
+.row .line2 { color: var(--text-2); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .side { display: flex; align-items: center; gap: 18px; color: var(--text-3); font-size: 13px; font-variant-numeric: tabular-nums; }
+.row .lead { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.row .lead > div { min-width: 0; }
+
+/* run: path of blocks */
+.path { display: block; max-width: 100%; margin: 0 0 18px -8px; padding: 0; border-radius: 12px; text-align: left; }
+.path ol { display: flex; align-items: center; flex-wrap: nowrap; margin: 0; padding: 0; list-style: none; }
+.path li { display: flex; align-items: center; }
+.path:hover .chip:not(.now):not(.end-ok) { color: var(--text-2); }
+.path li + li::before { content: ""; width: 10px; height: 1px; background: #2f2f35; }
+.chip { font: 12.5px/1 var(--mono); color: var(--text-3); background: transparent; padding: 8px 8px; border-radius: 9px; white-space: nowrap; transition: background-color .15s, color .15s; }
+.chip.now { color: var(--accent-text); background: var(--accent-chip); padding: 8px 11px; }
+.chip.end-ok { color: var(--text); background: var(--well); padding: 8px 11px; }
+.chip.more { color: var(--text-3); background: transparent; }
+
+/* the one card that matters */
+.move { background: var(--accent-tint); border-radius: var(--r-card); padding: 30px 32px 28px; box-shadow: var(--lift); }
+.move.neutral { background: var(--card); }
+.move .label { font-size: 13px; font-weight: 500; color: var(--accent-text); display: flex; align-items: center; gap: 8px; }
+.move.neutral .label { color: var(--text-2); }
+.move h2 { font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: -.015em; margin: 10px 0 18px; }
+.move .said { color: var(--text-2); max-width: 64ch; margin: 0; white-space: pre-line; }
+.move .said code, .prose code { font: 12.5px var(--mono); color: var(--text); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 5px; }
+.move .cap { font-size: 13px; color: var(--text-3); margin: 24px 0 10px; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: start; padding: 14px 16px; border-radius: var(--r-block); background: rgba(255,255,255,.03); cursor: pointer; transition: background-color .15s; }
+.check:hover { background: rgba(255,255,255,.05); }
+.check input { appearance: none; width: 20px; height: 20px; margin: 2px 0 0; border-radius: 7px; background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.18); cursor: pointer; display: grid; place-items: center; transition: background-color .15s, box-shadow .15s; }
+.check input::after { content: ""; width: 10px; height: 6px; border: 2px solid var(--page); border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px) scale(.6); opacity: 0; transition: opacity .12s, transform .18s var(--ease-out); }
+.check input:checked { background: var(--accent-text); box-shadow: none; }
+.check input:checked::after { opacity: 1; transform: rotate(-45deg) translate(1px, -1px) scale(1); }
+.check span { color: var(--text); }
+.check input:checked + span { color: var(--text-2); }
+.qs { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; counter-reset: q; }
+.qs li { counter-increment: q; display: grid; grid-template-columns: 24px 1fr; gap: 14px; padding: 14px 16px; border-radius: var(--r-block); background: rgba(255,255,255,.035); color: var(--text); }
+.qs li::before { content: counter(q); width: 24px; height: 24px; border-radius: 50%; background: rgba(141,182,250,.14); color: var(--accent-text); font-size: 13px; font-weight: 500; display: grid; place-items: center; margin-top: 1px; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.linkish { color: var(--text-2); font-size: 13px; margin-top: 8px; padding: 4px 10px; margin-left: -10px; border-radius: 999px; }
+.linkish:hover { color: var(--text); background: rgba(255,255,255,.05); }
+.reply { margin-top: 22px; }
+.reply label { display: block; font-size: 13px; color: var(--text-3); margin-bottom: 10px; }
+textarea.soft, input.soft { width: 100%; background: rgba(0,0,0,.22); border: 0; border-radius: var(--r-block); padding: 14px 16px; color: var(--text); line-height: 1.55; resize: vertical; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); transition: box-shadow .15s; }
+textarea.soft:focus, input.soft:focus { box-shadow: inset 0 0 0 1.5px rgba(141,182,250,.6); outline: none; }
+textarea.soft::placeholder { color: #6f6f78; }
+.move .acts { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; gap: 12px; }
+.move .hint { font-size: 13px; color: var(--text-3); margin-top: 10px; }
+.quote { margin: 18px 0 0; padding: 14px 16px; border-radius: var(--r-block); background: rgba(255,255,255,.03); color: var(--text-2); }
+.next { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.next span { font: 12.5px var(--mono); color: var(--text-2); background: rgba(255,255,255,.04); padding: 7px 10px; border-radius: 9px; }
+
+/* key/value: keys are the tool's words (mono), values read as text unless they are ids */
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 10px 28px; margin: 0; }
+.kv dt { font: 12.5px/1.7 var(--mono); color: var(--text-3); }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.kv dd.v-mono { font: 12.5px/1.6 var(--mono); }
+.kv dd.v-prose { color: var(--text-2); font-size: 15px; line-height: 1.6; white-space: pre-line; }
+
+/* disclosure group */
+.more { margin-top: 20px; background: var(--card); border-radius: var(--r-card); box-shadow: var(--lift); }
+.more + .more { margin-top: 10px; }
+.more > button { width: 100%; display: flex; align-items: center; gap: 14px; padding: 18px 24px; text-align: left; border-radius: var(--r-card); transition: background-color .15s; }
+.more > button:hover { background: rgba(255,255,255,.02); }
+.more > button .title { font-weight: 500; }
+.more > button .meta { flex: 1; }
+.chev { width: 16px; height: 16px; color: var(--text-3); transition: transform .2s var(--ease-out); flex: none; }
+[aria-expanded="true"] > .chev, [aria-expanded="true"] .chev { transform: rotate(90deg); }
+.more .body { padding: 0 24px 24px; animation: fade .18s linear both; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* history: one entry per step, notes folded under it */
+.steps { list-style: none; margin: 0; padding: 0; position: relative; }
+.step { position: relative; padding-left: 30px; }
+.step::before { content: ""; position: absolute; left: 6px; top: 22px; bottom: -14px; width: 1px; background: #2a2a2f; }
+.step:last-child::before { display: none; }
+.step .mark { position: absolute; left: 1px; top: 15px; width: 11px; height: 11px; border-radius: 4px; background: #3a3a41; }
+.step.now .mark { background: var(--accent); }
+.step.end .mark { background: var(--ok); }
+.step.endbad .mark { background: var(--err); }
+.step > button { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 12px; text-align: left; padding: 9px 12px; margin-left: -12px; border-radius: 12px; transition: background-color .12s; }
+.step > button:hover { background: rgba(255,255,255,.03); }
+.step .st { font-weight: 500; }
+.step .sm { font-size: 13px; color: var(--text-3); margin-top: 1px; }
+.step .sm .mono { font-size: 12.5px; color: var(--text-2); }
+.step .tm { font: 12.5px var(--mono); color: var(--text-3); padding-top: 4px; }
+.step .detail { padding: 6px 0 18px; display: grid; gap: 14px; animation: fade .18s linear both; }
+.note { white-space: pre-line; color: var(--text-2); font-size: 15px; line-height: 1.6; max-width: 66ch; }
+.note .pct { font: 12.5px var(--mono); color: var(--text-3); margin-left: 6px; }
+.note.human { color: var(--text); padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,.03); }
+.note.err { color: var(--text); }
+.note .who { display: block; font-size: 13px; color: var(--text-3); margin-bottom: 4px; }
+
+/* graph */
+.graph { display: block; margin: 0 auto; height: auto; max-width: 100%; }
+.graph .edge { fill: none; stroke: #3b3b42; stroke-width: 1.25; }
+.graph .edge.human { stroke-dasharray: 4 4; }
+.graph .edge.taken { stroke: #7c7c87; stroke-width: 1.5; }
+.graph .edge.hot { stroke: var(--accent-text); stroke-width: 1.5; }
+.graph .edge.dim { opacity: .45; }
+.graph .elbl { font: 11px var(--mono); fill: var(--text-3); }
+.graph .elbl.hot { fill: var(--accent-text); }
+.graph .node rect { fill: #232327; }
+.graph .node text { font: 11px var(--mono); fill: var(--text-2); }
+.graph .node.taken rect { fill: #2c2c32; } .graph .node.taken text { fill: var(--text); }
+.graph .node.now rect { fill: var(--accent-chip); stroke: var(--accent); stroke-width: 1.25; } .graph .node.now text { fill: #dbe8ff; }
+.graph .node.dim { opacity: .4; }
+.graph .node.click { cursor: pointer; }
+.graph .node.click:hover rect { fill: #2e2e34; }
+.graph .node.now.click:hover rect { fill: #1f3157; }
+.legend { display: flex; gap: 20px; justify-content: center; margin-top: 14px; font-size: 13px; color: var(--text-3); }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 1.5px solid #7c7c87; vertical-align: middle; margin-right: 7px; }
+.legend i.h { border-top-style: dashed; border-color: #5a5a62; }
+
+/* editor */
+.ed { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 28px; align-items: start; }
+.ed .side { position: sticky; top: 24px; }
+.ed .side .card { padding: 4px 0 0; background: none; box-shadow: none; }
+.ed .side .bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.skill { margin: 0; white-space: pre-wrap; font: 12.5px/1.65 var(--mono); color: var(--text-2); max-height: calc(100vh - 220px); overflow: auto; }
+.blocks { background: var(--card); border-radius: var(--r-card); padding: 6px; box-shadow: var(--lift); }
+.blk { border-radius: var(--r-block); transition: background-color .12s; }
+.blk > button { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 13px 16px; text-align: left; border-radius: var(--r-block); }
+.blk:not(.open) > button:hover { background: var(--well); }
+.blk.open { background: var(--well); }
+.blk .bt { font-weight: 500; }
+.blk .bs { font-size: 13px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blk .bid { font: 12.5px var(--mono); color: var(--text-3); }
+.blk .form { padding: 4px 16px 18px; display: grid; gap: 16px; animation: fade .18s linear both; }
+.fld label { display: block; font-size: 13px; color: var(--text-3); margin-bottom: 8px; }
+.fld .soft { background: rgba(0,0,0,.25); }
+.fld textarea.code, .fld input.code { font: 12.5px/1.7 var(--mono); }
+.fld .hint { font-size: 13px; color: var(--text-3); margin-top: 6px; }
+.blk .rm { justify-self: end; font-size: 13px; color: var(--text-3); padding: 4px 8px; border-radius: 8px; }
+.blk .rm:hover { color: #f4a3a1; }
+.add { width: 100%; text-align: left; padding: 13px 16px; border-radius: var(--r-block); color: var(--text-3); font-size: 15px; }
+.add:hover { color: var(--text); background: var(--well); }
+.tag { font-size: 13px; color: var(--text-2); background: rgba(255,255,255,.05); border-radius: 999px; padding: 2px 9px; margin-left: 8px; font-weight: 400; }
+.pubstate { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-3); }
+.problems { margin-top: 12px; background: rgba(229,167,59,.08); border-radius: var(--r-block); padding: 12px 16px; font-size: 15px; color: var(--text); }
+
+/* keyboard sheet */
+.keys { position: fixed; left: 16px; bottom: 60px; width: 300px; background: #1c1c20; border-radius: 18px; padding: 18px 20px; box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 12px 40px rgba(0,0,0,.45); z-index: 10; animation: pop .18s var(--ease-out) both; transform-origin: bottom left; }
+@keyframes pop { from { opacity: 0; transform: scale(.97) translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .keys { animation: fade .12s linear both; } }
+.keys h3 { margin: 0 0 12px; font-size: 15px; font-weight: 500; }
+.keys dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 14px; margin: 0; font-size: 13px; color: var(--text-2); align-items: center; }
+.keys dt { display: flex; gap: 4px; }
+.keys dd { margin: 0; }
+.keys p { margin: 16px 0 0; font-size: 13px; color: var(--text-3); line-height: 1.5; }
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .rail { flex-direction: row; align-items: center; padding: 10px 12px; gap: 6px; }
+  .brand { padding: 0 8px 0 4px; }
+  .rail .foot { display: none; }
+  .sheet { margin: 0 8px 8px; }
+  .page { padding: 32px 20px 72px; }
+  .ed { grid-template-columns: 1fr; }
+  .ed .side { position: static; }
+  .path { overflow-x: auto; scrollbar-width: none; }
+  .move, .ask { padding: 22px 20px; }
+  .qs li { padding: 12px; gap: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Main">
+    <a class="brand" href="#/"><img src="assets/mark.svg" alt=""><span>machine</span></a>
+    <a class="nav" id="nav-runs" href="#/"><span>Runs</span><span id="nav-count"></span></a>
+    <a class="nav" id="nav-machines" href="#/machines"><span>Machines</span></a>
+    <div class="foot"><button class="keys-btn" id="keys-btn" aria-haspopup="dialog" aria-expanded="false"><kbd>?</kbd> Keyboard</button></div>
+  </nav>
+  <main class="sheet" id="sheet"><div id="view"></div></main>
+</div>
+<div id="keys-root"></div>
+<script src="data.js"></script>
+<script>
+"use strict";
+const D = window.DATA;
+const NOW = Date.parse(D.capturedAt);
+const runs = D.runs.map((r) => structuredClone(r));
+const machines = Object.fromEntries(D.machines.map((m) => [m.id, m]));
+const machineOrder = D.machines.map((m) => m.id).sort((a, b) => machines[a].name.localeCompare(machines[b].name));
+
+/* ---------- helpers ---------- */
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const prose = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+const since = (iso) => { const s = Math.max(0, (NOW - Date.parse(iso)) / 1000); return s < 60 ? "just now" : s < 3600 ? `${Math.round(s / 60)}m ago` : s < 86400 ? `${Math.round(s / 3600)}h ago` : `${Math.round(s / 86400)}d ago`; };
+const hhmm = (iso) => new Date(iso).toTimeString().slice(0, 5);
+const needsYou = (r) => r.status === "blocked" || r.status === "waiting";
+const dotOf = (r) => needsYou(r) ? "needs" : r.status === "running" ? "running" : r.status === "succeeded" ? "ok" : r.status === "failed" ? "fail" : "";
+const word = { blocked: "Blocked", waiting: "Waiting for you", running: "Running", succeeded: "Succeeded", failed: "Failed", cancelled: "Cancelled" };
+const status = (r) => `<span class="status"><span class="dot ${dotOf(r)}"></span>${word[r.status]}</span>`;
+const chev = `<svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const backArrow = `<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const plural = (n, a, b = a + "s") => `${n} ${n === 1 ? a : b}`;
+const fmt = (v) => Array.isArray(v) ? v.join(", ") : v && typeof v === "object" ? JSON.stringify(v) : String(v);
+const isProse = (v) => typeof v === "string" && (v.length > 60 || /\s.*\s.*\s/.test(v)) && !/^[\w./~:-]+$/.test(v);
+function kv(obj) {
+  return `<dl class="kv">${Object.entries(obj).map(([k, v]) => `<dt>${esc(k)}</dt><dd class="${isProse(v) ? "v-prose" : "v-mono"}">${isProse(v) ? prose(v) : esc(fmt(v))}</dd>`).join("")}</dl>`;
+}
+const runsOrdered = () => [...runs].sort((a, b) => Number(needsYou(b)) - Number(needsYou(a)) || Number(b.status === "running") - Number(a.status === "running") || b.updated_at.localeCompare(a.updated_at));
+
+// Group the append-only history into one entry per step visited; notes and errors fold under their step.
+function visits(run) {
+  const out = []; let cur = null;
+  for (const h of run.history) {
+    if (h.type === "begin") { cur = { state: h.to, at: h.ts, items: [] }; out.push(cur); }
+    else if (h.type === "transition") { cur.left = h; cur = { state: h.to, at: h.ts, items: [] }; out.push(cur); }
+    else if (cur) cur.items.push(h);
+  }
+  return out;
+}
+
+/* ---------- graph ---------- */
+function smooth(p) {
+  if (p.length < 3) return p.map((q, i) => `${i ? "L" : "M"}${q[0]},${q[1]}`).join(" ");
+  let d = `M${p[0][0]},${p[0][1]}`;
+  for (let i = 1; i < p.length - 1; i++) d += ` Q${p[i][0]},${p[i][1]} ${(p[i][0] + p[i + 1][0]) / 2},${(p[i][1] + p[i + 1][1]) / 2}`;
+  const l = p[p.length - 1]; return d + ` L${l[0]},${l[1]}`;
+}
+function graph(m, { current, path, selected, clickable, fit } = {}) {
+  const L = m.layout.TB;
+  const takenE = (e) => path && path.edges.has(`${e.from}:${e.ev}`);
+  const takenN = (id) => path && path.nodes.has(id);
+  const edges = L.edges.map((e) => {
+    const taken = takenE(e), hot = selected && e.from === selected;
+    const cls = ["edge", e.human ? "human" : "", taken ? "taken" : "", hot ? "hot" : "", path && !taken ? "dim" : ""].join(" ");
+    const marker = hot ? "url(#ah-hot)" : taken ? "url(#ah-taken)" : "url(#ah)";
+    const label = (taken || hot) ? `<text class="elbl${hot ? " hot" : ""}" x="${e.x}" y="${e.y + 3}" text-anchor="middle">${esc(e.ev)}</text>` : "";
+    return `<path class="${cls}" d="${smooth(e.points)}" marker-end="${marker}"/>${label}`;
+  }).join("");
+  const nodes = L.nodes.map((n) => {
+    const now = n.id === (selected ?? current), taken = takenN(n.id);
+    const cls = ["node", now ? "now" : "", taken ? "taken" : "", path && !taken && !now ? "dim" : "", clickable ? "click" : ""].join(" ");
+    const attrs = clickable ? ` data-node="${n.id}" role="button" tabindex="0" aria-label="Select step ${n.id}"` : "";
+    return `<g class="${cls}"${attrs}><rect x="${n.x - n.w / 2}" y="${n.y - n.h / 2}" width="${n.w}" height="${n.h}" rx="${n.final ? n.h / 2 : 9}"/><text x="${n.x}" y="${n.y + 4}" text-anchor="middle">${esc(n.id)}</text></g>`;
+  }).join("");
+  const mk = (id, c) => `<marker id="${id}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1.2 6.8 4 1 6.8" fill="none" stroke="${c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></marker>`;
+  return `<svg class="graph" viewBox="0 0 ${L.width} ${L.height}" width="${L.width}"${fit ? ` style="max-height:${fit};width:auto"` : ""} role="img" aria-label="Map of ${esc(m.name)}"><defs>${mk("ah", "#4a4a52")}${mk("ah-taken", "#7c7c87")}${mk("ah-hot", "#8db6fa")}</defs>${edges}${nodes}</svg>`;
+}
+
+/* ---------- app state ---------- */
+const ui = { sel: { runs: 0, machines: 0 }, open: {}, step: {}, edSel: {}, pane: "map", drafts: {}, published: {}, from: null, armed: false, keys: false, checks: {}, full: {} };
+let route = parse();
+function parse() {
+  const [a, b] = location.hash.replace(/^#\/?/, "").split("/");
+  if (a === "runs" && b) return { screen: "run", id: b };
+  if (a === "machines" && b) return { screen: "editor", id: b };
+  if (a === "machines") return { screen: "machines" };
+  return { screen: "runs" };
+}
+window.addEventListener("hashchange", () => {
+  const prev = route; route = parse();
+  ui.from = prev.screen === "run" && route.screen === "editor" ? prev : (route.screen === "editor" && ui.from && ui.from.screen === "run" && prev.screen === "editor") ? ui.from : (route.screen === "editor" ? null : ui.from);
+  ui.armed = false;
+  render(true);
+});
+const go = (h) => { location.hash = h; };
+
+/* ---------- screens ---------- */
+function backLink(href, label) { return `<a class="back" href="${href}">${backArrow}${esc(label)}</a>`; }
+
+function RunsScreen() {
+  const list = runsOrdered();
+  const mine = list.filter(needsYou), rest = list.filter((r) => !needsYou(r));
+  const sel = Math.min(ui.sel.runs, list.length - 1);
+  const ask = (r, i) => {
+    const m = machines[r.machine.id], s = m.states[r.state];
+    const needs = r.error?.needs ?? [];
+    const what = r.status === "blocked"
+      ? `Stopped at ${esc(s.title)}. The agent needs ${needs.length ? plural(needs.length, "answer") : "you"} before it can go on.`
+      : `Stopped at ${esc(s.title)}. You choose what happens next.`;
+    return `<a class="ask${i === sel ? " sel" : ""}" href="#/runs/${r.id}" data-i="${i}">
+      <div class="top">${status(r)}<span class="meta">${since(r.updated_at)}</span></div>
+      <div class="who">${esc(m.name)}</div>
+      <div class="what">${what}</div>
+      ${needs[0] ? `<div class="need">${esc(needs[0])}</div>` : ""}
+      <div class="go"><span class="btn primary">Open run</span></div>
+    </a>`;
+  };
+  const row = (r, i) => {
+    const m = machines[r.machine.id], s = m.states[r.state];
+    const line2 = r.status === "running" ? `On ${esc(s.title)}` : esc(s.title);
+    return `<a class="row${i === sel ? " sel" : ""}" href="#/runs/${r.id}" data-i="${i}">
+      <div class="lead"><span class="dot ${dotOf(r)}" aria-label="${word[r.status]}"></span><div><div class="name">${esc(m.name)}</div><div class="line2">${line2}</div></div></div>
+      <div class="side">${since(r.updated_at)}</div></a>`;
+  };
+  const running = rest.filter((r) => r.status === "running"), done = rest.filter((r) => r.status !== "running");
+  let i = 0;
+  return `<div class="page narrow enter">
+    <div class="head"><div><h1 tabindex="-1">Runs</h1></div></div>
+    ${mine.length ? `<h2 class="section">Waiting on you</h2>${mine.map((r) => ask(r, i++)).join("")}` : `<div class="calm">Nothing is waiting on you. Runs that stop for a decision show up here first.</div>`}
+    ${running.length ? `<h2 class="section gap-l">Running</h2><div class="list">${running.map((r) => row(r, i++)).join("")}</div>` : ""}
+    ${done.length ? `<h2 class="section gap-l">Finished</h2><div class="list">${done.map((r) => row(r, i++)).join("")}</div>` : ""}
+  </div>`;
+}
+
+function pathChips(run, m, vs) {
+  const ids = vs.map((v) => v.state);
+  const last = ids.length - 1;
+  const finalOk = m.states[run.state]?.kind === "final";
+  let items = ids.map((id, i) => ({ id, i }));
+  if (items.length > 10) items = [...items.slice(0, 2), { more: items.length - 8 }, ...items.slice(-6)];
+  return `<button class="path" data-act="map" aria-label="Steps taken: ${ids.join(", ")}. Show the map."><ol aria-hidden="true">${items.map((it) => it.more
+    ? `<li><span class="chip more">${it.more} more</span></li>`
+    : `<li><span class="chip${it.i === last ? (finalOk ? " end-ok" : " now") : ""}">${esc(it.id)}</span></li>`).join("")}</ol></button>`;
+}
+
+function MoveCard(run, m) {
+  const s = m.states[run.state];
+  const key = run.id;
+  if (run.status === "blocked") {
+    const needs = run.error?.needs ?? [];
+    return `<section class="move" aria-labelledby="move-h">
+      <div class="label">Your move</div>
+      <h2 id="move-h">${esc(s.title)}</h2>
+      ${needs.length ? `<ol class="qs" aria-label="What the agent asks">${needs.map((n) => `<li><span>${esc(n)}</span></li>`).join("")}</ol>` : ""}
+      <p class="said${ui.full[key] ? "" : " clamp"}" style="margin-top:20px">${prose(run.error?.message)}</p>
+      ${(run.error?.message ?? "").length > 240 ? `<button class="linkish" data-act="full">${ui.full[key] ? "Show less" : "Read the agent's full note"}</button>` : ""}
+      <div class="reply"><label for="reply">Your answer</label><textarea id="reply" class="soft" rows="2" placeholder="For example: record OpenCode and Pi as skipped for this fixture run, and the Inbox check as not applicable.">${esc(ui.drafts["reply:" + key] ?? "")}</textarea></div>
+      <div class="acts"><button class="btn primary" data-act="resume">Resume the run</button>${ui.armed ? `<button class="btn danger small" data-act="cancel-confirm">Yes, cancel this run</button>` : `<button class="btn quiet small" data-act="cancel">Cancel run</button>`}</div>
+      <div class="hint">Your answer is saved with the run, and the agent reads it when it continues.</div>
+    </section>`;
+  }
+  if (run.status === "waiting") {
+    const human = Object.entries(s.on ?? {}).filter(([, t]) => t.actor === "human");
+    return `<section class="move" aria-labelledby="move-h">
+      <div class="label">Your move</div>
+      <h2 id="move-h">${esc(s.title)}</h2>
+      ${s.instructions ? `<p class="said">${prose(s.instructions)}</p>` : ""}
+      <div class="acts" style="justify-content:flex-start">${human.map(([ev, t], i) => `<button class="btn ${i ? "soft" : "primary"}" data-act="human" data-ev="${ev}">${esc(ev.replace(/_/g, " "))}</button>`).join("")}</div>
+    </section>`;
+  }
+  const vs = visits(run), lastV = vs[vs.length - 1];
+  if (run.status === "running") {
+    const agentEv = Object.entries(s.on ?? {}).filter(([, t]) => (t.actor ?? "agent") === "agent");
+    const unblock = [...run.history].reverse().find((h) => h.type === "unblock");
+    return `<section class="move neutral" aria-labelledby="move-h">
+      <div class="label"><span class="dot running"></span>The agent is working</div>
+      <h2 id="move-h">${esc(s.title)}</h2>
+      <p class="said" style="margin-bottom:0">Nothing to do here. This page updates as the agent reports.</p>
+      ${unblock?.note ? `<div class="quote"><span class="meta" style="display:block;margin-bottom:4px">You answered, ${hhmm(unblock.ts)}</span>${prose(unblock.note)}</div>` : ""}
+      <p class="cap">It finishes this step with one of</p>
+      <div class="next">${agentEv.map(([ev, t]) => `<span>${esc(ev)} to ${esc(t.to)}</span>`).join("")}</div>
+    </section>`;
+  }
+  // finished
+  const prev = vs.length > 1 ? vs[vs.length - 2].left : null;
+  const failed = run.status !== "succeeded";
+  return `<section class="move neutral" aria-labelledby="move-h">
+    <div class="label"><span class="dot ${dotOf(run)}"></span>${word[run.status]} ${since(run.updated_at)}</div>
+    <h2 id="move-h">${esc(s.title)}</h2>
+    ${run.status === "cancelled" ? `<p class="said">You cancelled this run.</p>` : ""}
+    ${prev?.payload && Object.keys(prev.payload).length ? `<p class="cap" style="margin-top:0">The agent's last report</p>${kv(prev.payload)}` : ""}
+    ${failed && run.error ? `<p class="said">${prose(run.error.message)}</p>` : ""}
+  </section>`;
+}
+
+function HistoryBody(run, m) {
+  const vs = visits(run), last = vs.length - 1;
+  const open = (ui.step[run.id] ??= new Set());
+  return `<ol class="steps">${vs.map((v, i) => {
+    const s = m.states[v.state] ?? { title: v.state };
+    const notes = v.items.filter((h) => h.type === "note").length;
+    const isNow = i === last && s.kind !== "final", isEnd = i === last && s.kind === "final";
+    const bits = [];
+    if (v.left) bits.push(`left with <span class="mono">${esc(v.left.event)}</span>`);
+    if (notes) bits.push(plural(notes, "note"));
+    if (v.items.some((h) => h.type === "error")) bits.push("stopped for you");
+    if (v.items.some((h) => h.type === "unblock")) bits.push("you answered");
+    if (isNow && !bits.length) bits.push("current step");
+    if (isEnd) bits.push(s.outcome === "failure" ? "ended, failure" : "ended");
+    const ex = open.has(i);
+    const detail = ex ? `<div class="detail">
+      ${v.left?.payload && Object.keys(v.left.payload).length ? kv(v.left.payload) : ""}
+      ${v.left?.note ? `<div class="note">${prose(v.left.note)}</div>` : ""}
+      ${v.items.map((h) => h.type === "note" ? `<div class="note">${prose(h.note)}${h.progress !== undefined ? `<span class="pct">${h.progress}%</span>` : ""}</div>`
+        : h.type === "error" ? `<div class="note err"><span class="who">Stopped, ${hhmm(h.ts)}</span>${prose(h.error?.message)}</div>`
+        : h.type === "unblock" ? `<div class="note human"><span class="who">You, ${hhmm(h.ts)}</span>${h.note ? prose(h.note) : "Resumed the run."}</div>`
+        : h.type === "cancel" ? `<div class="note human"><span class="who">You, ${hhmm(h.ts)}</span>Cancelled the run.</div>`
+        : h.type === "rejected" ? `<div class="note"><span class="who">Rejected call</span>${esc(h.error?.message)}</div>` : "").join("")}
+      ${!v.items.length && !v.left?.payload ? `<div class="meta">Nothing reported yet.</div>` : ""}
+    </div>` : "";
+    return `<li class="step${isNow ? " now" : ""}${isEnd ? (s.outcome === "failure" ? " endbad" : " end") : ""}"><span class="mark"></span>
+      <button aria-expanded="${ex}" data-step="${i}"><div><div class="st">${esc(s.title)}</div><div class="sm">${bits.join(", ")}</div></div><span class="tm">${hhmm(v.at)}</span></button>${detail}</li>`;
+  }).join("")}</ol>`;
+}
+
+function DetailsBody(run) {
+  const a = run.agent ?? {};
+  const ok = run.preflight.filter((p) => p.ok).length;
+  return `<div style="display:grid;gap:26px">
+    ${Object.keys(run.inputs).length ? `<div><p class="cap meta" style="margin:0 0 10px">Inputs</p>${kv(run.inputs)}</div>` : ""}
+    ${run.preflight.length ? `<div><p class="meta" style="margin:0 0 12px">Checked before it started: ${ok} of ${run.preflight.length} passed</p><ol class="steps">${run.preflight.map((p) => `<li class="step${p.ok ? "" : " endbad"}" style="padding-bottom:12px"><span class="mark" style="top:5px;${p.ok ? "background:var(--ok)" : ""}"></span><div class="mono" style="color:var(--text)">${esc(p.id)}</div>${p.detail ? `<div class="note" style="font-size:13.5px">${prose(p.detail)}</div>` : ""}</li>`).join("")}</ol></div>` : ""}
+    <div><p class="meta" style="margin:0 0 10px">Run</p>${kv({ run: run.id, machine: `${run.machine.id} v${run.machine.version}`, agent: a.name ?? "unknown", ...(a.session ? { session: a.session } : {}), started: new Date(run.created_at).toLocaleString(), updated: new Date(run.updated_at).toLocaleString() })}</div>
+  </div>`;
+}
+
+function RunScreen(id) {
+  const run = runs.find((r) => r.id === id);
+  if (!run) return `<div class="page narrow enter">${backLink("#/", "Runs")}<h1 tabindex="-1">Run not found</h1><p class="t2">There is no run with id ${esc(id)}.</p></div>`;
+  const m = machines[run.machine.id];
+  const vs = visits(run);
+  const open = (ui.open[run.id] ??= new Set());
+  const path = { nodes: new Set(vs.map((v) => v.state)), edges: new Set(vs.filter((v) => v.left).map((v) => `${v.left.from}:${v.left.event}`)) };
+  const notes = run.history.filter((h) => h.type === "note").length;
+  const live = needsYou(run) || run.status === "running";
+  const sub = live ? `Step ${vs.length}. Started ${hhmm(run.created_at)} by ${esc(run.agent?.name ?? "an agent")}, last update ${since(run.updated_at)}.`
+    : `${plural(vs.length, "step")}, ${hhmm(run.created_at)} to ${hhmm(run.updated_at)}. Run by ${esc(run.agent?.name ?? "an agent")}.`;
+  const group = (k, title, meta, body) => `<section class="more"><button aria-expanded="${open.has(k)}" data-open="${k}"><span class="title">${title}</span><span class="meta">${meta}</span>${chev}</button>${open.has(k) ? `<div class="body">${body()}</div>` : ""}</section>`;
+  return `<div class="page narrow enter">
+    <div class="crumbs">${backLink("#/", "Runs")}<a class="back" href="#/machines/${m.id}">Open machine</a></div>
+    <div class="head"><div><h1 tabindex="-1">${esc(m.name)}</h1><div class="sub">${sub}</div></div></div>
+    ${pathChips(run, m, vs)}
+    ${MoveCard(run, m)}
+    <div style="height:12px"></div>
+    ${group("history", "History", `${plural(vs.length, "step")}, ${plural(notes, "note")} from the agent`, () => HistoryBody(run, m))}
+    ${group("map", "Map", `${plural(Object.keys(m.states).length, "step")} in ${esc(m.name)}, the path taken is lit`, () => `${graph(m, { current: run.state, path })}<div class="legend"><span><i></i>taken</span><span><i class="h"></i>a person decides</span></div>`)}
+    ${group("details", "Inputs and checks", `${plural(Object.keys(run.inputs).length, "input")}, ${run.preflight.filter((p) => p.ok).length} of ${run.preflight.length} checks passed`, () => DetailsBody(run))}
+  </div>`;
+}
+
+function MachinesScreen() {
+  const sel = Math.min(ui.sel.machines, machineOrder.length - 1);
+  return `<div class="page narrow enter">
+    <div class="head"><div><h1 tabindex="-1">Machines</h1><div class="sub">The processes your agents follow. Open one to read or change its steps.</div></div><div class="actions"><button class="btn soft" data-act="new">New machine</button></div></div>
+    <div class="list">${machineOrder.map((id, i) => {
+      const m = machines[id]; const mine = runs.filter((r) => r.machine.id === id).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+      const waiting = mine.filter(needsYou).length;
+      return `<a class="row${i === sel ? " sel" : ""}" href="#/machines/${id}" data-i="${i}" style="padding:16px 18px">
+        <div style="min-width:0"><div class="name">${esc(m.name)}</div><div class="line2">${esc(m.description)}</div></div>
+        <div class="side">${waiting ? `<span class="status"><span class="dot needs"></span>${waiting} waiting</span>` : ""}<span style="min-width:96px;text-align:right">${mine[0] ? `ran ${since(mine[0].updated_at)}` : "never run"}</span></div>
+      </a>`;
+    }).join("")}</div>
+  </div>`;
+}
+
+/* editor line formats (same as src/ui/lines.ts) */
+const SEP = " · ";
+const fFields = (f) => Object.entries(f ?? {}).map(([k, v]) => [k, v.enum ? `${v.type}(${v.enum.join("|")})` : v.type, v.required ? "required" : null, v.description ?? null].filter((x) => x !== null).join(SEP)).join("\n");
+const fReqs = (r) => (r ?? []).map((x) => [x.id, x.description, x.check, x.required === false ? "optional" : null].filter((v) => v !== null).join(SEP)).join("\n");
+const fEvents = (on) => Object.entries(on ?? {}).map(([ev, t]) => [`${ev}${t.actor === "human" ? " (human)" : ""} → ${t.to}`, t.description ?? null].filter((v) => v !== null).join(SEP)).join("\n");
+const kindWord = (s) => s.kind === "decision" ? "Decision" : s.kind === "wait" ? "A person decides" : s.kind === "final" ? (s.outcome === "failure" ? "End, failure" : "End") : "";
+
+function EditorScreen(id) {
+  const m = machines[id];
+  if (!m) return `<div class="page narrow enter">${backLink("#/machines", "Machines")}<h1 tabindex="-1">New machine</h1><p class="t2" style="max-width:56ch">In the product this opens a blank machine with a first step and an end. The prototype stops here.</p></div>`;
+  const sel = ui.edSel[id] ?? null;
+  const dirty = !!ui.drafts["dirty:" + id];
+  const version = ui.published[id] ?? m.version;
+  const mine = runs.filter((r) => r.machine.id === id);
+  const waiting = mine.filter(needsYou);
+  const back = ui.from?.screen === "run" ? backLink(`#/runs/${ui.from.id}`, "Back to the run") : backLink("#/machines", "Machines");
+  const blk = (bid, title, summary, idTxt, form) => `<div class="blk${sel === bid ? " open" : ""}" data-blk="${bid}">
+      <button aria-expanded="${sel === bid}" data-sel="${bid}"><div style="min-width:0"><div class="bt">${title}</div>${summary ? `<div class="bs">${summary}</div>` : ""}</div><span class="bid">${idTxt}</span></button>
+      ${sel === bid ? `<div class="form">${form()}</div>` : ""}</div>`;
+  const ta = (label, val, { code, rows, hint } = {}) => `<div class="fld"><label>${label}</label><textarea class="soft${code ? " code" : ""}" rows="${Math.max(rows ?? 2, String(val).split("\n").reduce((n, l) => n + Math.max(1, Math.ceil(l.length / (code ? 64 : 60))), 0))}" data-edit spellcheck="false">${esc(val)}</textarea>${hint ? `<div class="hint">${hint}</div>` : ""}</div>`;
+  const inp = (label, val, code) => `<div class="fld"><label>${label}</label><input class="soft${code ? " code" : ""}" value="${esc(val)}" data-edit spellcheck="false"></div>`;
+  const about = blk("about", "Name, inputs and checks", `starts at ${esc(m.initial)}, ${plural(Object.keys(m.inputs ?? {}).length, "input")}, ${plural((m.requirements ?? []).length, "check")}`, esc(m.id), () =>
+    inp("Name", m.name) + ta("Description", m.description, { rows: 3, hint: "Becomes the skill description. Say when to use it." }) + inp("Id", m.id, true) + inp("Starts at", m.initial, true) +
+    ta("Inputs", fFields(m.inputs), { code: true, hint: "One per line: name · type · required · description" }) +
+    ta("Checks before it starts", fReqs(m.requirements), { code: true, hint: "One per line: id · what must be true · how the agent checks it" }));
+  const states = Object.entries(m.states).map(([sid, s]) => {
+    const next = Object.values(s.on ?? {}).map((t) => t.to);
+    const summary = [kindWord(s), next.length ? `then ${[...new Set(next)].join(" or ")}` : ""].filter(Boolean).join(", ");
+    return blk(sid, esc(s.title), esc(summary), esc(sid), () => {
+      const kinds = [["task", "Task"], ["decision", "Decision"], ["wait", "A person decides"], ["final", "End"]];
+      return inp("Title", s.title) +
+        `<div class="fld"><label>Kind</label><div class="seg" role="group" aria-label="Kind">${kinds.map(([k, w]) => `<button aria-pressed="${s.kind === k}" data-kind="${k}">${w}</button>`).join("")}</div></div>` +
+        (s.kind === "final" ? "" :
+          (s.kind !== "wait" ? ta("What the agent does", s.instructions ?? "", { rows: 4 }) + ta("What it reports when it leaves", fFields(s.output), { code: true, hint: "One per line: name · type · required · description" }) : "") +
+          ta("Where it goes next", fEvents(s.on), { code: true, hint: s.kind === "wait" ? "event (human) → step · when" : "event → step · when to fire it" })) +
+        `<button class="rm" data-act="remove">Remove this step</button>`;
+    });
+  }).join("");
+  const pub = dirty ? `<span class="pubstate"><span class="dot needs"></span>Unpublished changes</span><button class="btn primary" data-act="publish">Publish v${version + 1}</button>`
+    : `<span class="pubstate"><span class="dot ok"></span>${ui.published[id] ? `Published v${version} just now` : `Published v${version}`}</span>`;
+  const runsLine = mine.length ? `${plural(mine.length, "run")}${waiting.length ? `, <a href="#/runs/${waiting[0].id}" style="color:var(--text-2);text-decoration:underline;text-underline-offset:3px;text-decoration-color:#55555e">${waiting.length} waiting on you</a>` : ""}` : "No runs yet";
+  return `<div class="page wide enter">
+    ${back}
+    <div class="head"><div><h1 tabindex="-1">${esc(m.name)}</h1><div class="sub">${plural(Object.keys(m.states).length, "step")}. ${runsLine}.</div></div><div class="actions">${pub}</div></div>
+    <div class="ed">
+      <div>
+        <div class="blocks">${about}</div>
+        <h2 class="section" style="margin-top:28px">Steps</h2>
+        <div class="blocks">${states}<button class="add" data-act="add">Add a step</button></div>
+      </div>
+      <div class="side"><div class="card">
+        <div class="bar"><div class="seg" role="group" aria-label="View"><button aria-pressed="${ui.pane === "map"}" data-pane="map">Map</button><button aria-pressed="${ui.pane === "skill"}" data-pane="skill">Skill the agent reads</button></div><span class="meta">${ui.pane === "map" ? "click a step to open it" : "SKILL.md"}</span></div>
+        ${ui.pane === "map" ? graph(m, { selected: sel && sel !== "about" ? sel : undefined, clickable: true, fit: "calc(100vh - 120px)" }) : `<pre class="skill">${esc(m.skill)}</pre>`}
+      </div></div>
+    </div>
+  </div>`;
+}
+
+/* ---------- render + events ---------- */
+const view = document.getElementById("view"), sheet = document.getElementById("sheet");
+function render(navigated) {
+  const need = runs.filter(needsYou).length;
+  document.getElementById("nav-count").innerHTML = need ? `<span class="count" aria-label="${need} waiting on you">${need}</span>` : "";
+  const onRuns = route.screen === "runs" || route.screen === "run";
+  document.getElementById("nav-runs").toggleAttribute("aria-current", onRuns); if (onRuns) document.getElementById("nav-runs").setAttribute("aria-current", "page");
+  const onM = !onRuns; document.getElementById("nav-machines").toggleAttribute("aria-current", onM); if (onM) document.getElementById("nav-machines").setAttribute("aria-current", "page");
+  const keepScroll = sheet.scrollTop;
+  view.innerHTML = route.screen === "run" ? RunScreen(route.id) : route.screen === "machines" ? MachinesScreen() : route.screen === "editor" ? EditorScreen(route.id) : RunsScreen();
+  document.title = `${route.screen === "runs" ? "Runs" : route.screen === "machines" ? "Machines" : (view.querySelector("h1")?.textContent ?? "")} · machine`;
+  const strip = view.querySelector(".path"); if (strip) strip.scrollLeft = strip.scrollWidth; // keep the current step in view
+  if (navigated) { sheet.scrollTop = 0; view.querySelector("h1")?.focus({ preventScroll: true }); }
+  else { view.firstElementChild?.classList.remove("enter"); sheet.scrollTop = keepScroll; }
+}
+function rerender() { render(false); }
+
+view.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-act],[data-open],[data-step],[data-sel],[data-pane],[data-node],[data-kind]");
+  if (!t) return;
+  const run = route.screen === "run" ? runs.find((r) => r.id === route.id) : null;
+  if (t.dataset.open) { const s = ui.open[run.id]; s.has(t.dataset.open) ? s.delete(t.dataset.open) : s.add(t.dataset.open); return rerender(); }
+  if (t.dataset.step) { const s = ui.step[run.id]; const i = +t.dataset.step; s.has(i) ? s.delete(i) : s.add(i); return rerender(); }
+  if (t.dataset.sel) { const id = route.id; ui.edSel[id] = ui.edSel[id] === t.dataset.sel ? null : t.dataset.sel; return rerender(); }
+  if (t.dataset.node) { ui.edSel[route.id] = t.dataset.node; rerender(); view.querySelector(`[data-blk="${t.dataset.node}"]`)?.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); return; }
+  if (t.dataset.pane) { ui.pane = t.dataset.pane; return rerender(); }
+  if (t.dataset.kind) { ui.drafts["dirty:" + route.id] = true; return rerender(); }
+  const act = t.dataset.act;
+  if (act === "full") { ui.full[run.id] = !ui.full[run.id]; return rerender(); }
+  if (act === "map") { ui.open[run.id].add("map"); rerender(); view.querySelector('[data-open="map"]')?.scrollIntoView({ block: "start", behavior: "smooth" }); return; }
+  if (act === "resume") {
+    const note = (document.getElementById("reply")?.value ?? "").trim();
+    run.history.push({ ts: new Date(NOW).toISOString(), type: "unblock", actor: "human", ...(note ? { note } : {}) });
+    run.status = "running"; run.error = null; run.updated_at = new Date(NOW).toISOString();
+    ui.armed = false; render(false); view.querySelector(".move")?.classList.add("enter"); return;
+  }
+  if (act === "cancel") { ui.armed = true; rerender(); setTimeout(() => { if (ui.armed) { ui.armed = false; rerender(); } }, 4000); return; }
+  if (act === "cancel-confirm") { run.history.push({ ts: new Date(NOW).toISOString(), type: "cancel", actor: "human" }); run.status = "cancelled"; run.updated_at = new Date(NOW).toISOString(); run.error = null; ui.armed = false; return rerender(); }
+  if (act === "human") { const s = machines[run.machine.id].states[run.state]; const t2 = s.on[t.dataset.ev]; run.history.push({ ts: new Date(NOW).toISOString(), type: "transition", actor: "human", from: run.state, event: t.dataset.ev, to: t2.to }); run.state = t2.to; run.status = machines[run.machine.id].states[t2.to].kind === "final" ? "succeeded" : "running"; return rerender(); }
+  if (act === "publish") { ui.published[route.id] = (ui.published[route.id] ?? machines[route.id].version) + 1; ui.drafts["dirty:" + route.id] = false; return rerender(); }
+  if (act === "new") return go("/machines/new");
+  if (act === "add" || act === "remove") { ui.drafts["dirty:" + route.id] = true; return rerender(); }
+});
+view.addEventListener("input", (e) => {
+  if (e.target.id === "reply") { ui.drafts["reply:" + route.id] = e.target.value; return; }
+  if (e.target.matches("[data-edit]") && !ui.drafts["dirty:" + route.id]) { ui.drafts["dirty:" + route.id] = true; const pos = [e.target.selectionStart, e.target.selectionEnd]; const idx = [...view.querySelectorAll("[data-edit]")].indexOf(e.target); rerender(); const el = view.querySelectorAll("[data-edit]")[idx]; el?.focus(); el?.setSelectionRange(...pos); }
+});
+view.addEventListener("keydown", (e) => { if (e.target.matches("[data-node]") && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); } });
+
+/* keyboard */
+const keysBtn = document.getElementById("keys-btn"), keysRoot = document.getElementById("keys-root");
+function toggleKeys(on = !ui.keys) {
+  ui.keys = on; keysBtn.setAttribute("aria-expanded", on);
+  keysRoot.innerHTML = on ? `<div class="keys" role="dialog" aria-label="Keyboard" tabindex="-1"><h3>Keyboard</h3><dl>
+    <dt><kbd>j</kbd><kbd>k</kbd></dt><dd>Move down and up a list</dd>
+    <dt><kbd>enter</kbd></dt><dd>Open what is selected</dd>
+    <dt><kbd>esc</kbd></dt><dd>Close, then go back one level</dd>
+    <dt><kbd>g</kbd><kbd>r</kbd></dt><dd>Go to Runs</dd>
+    <dt><kbd>g</kbd><kbd>m</kbd></dt><dd>Go to Machines</dd>
+    <dt><kbd>?</kbd></dt><dd>Show or hide this</dd></dl>
+    <p>Prototype. Runs and machines were copied from localhost:7420 on ${new Date(NOW).toLocaleDateString()}. Actions change this page only; reload to reset.</p></div>` : "";
+  if (on) keysRoot.firstElementChild.focus(); else if (document.activeElement === document.body) keysBtn.focus();
+}
+keysBtn.addEventListener("click", () => toggleKeys());
+let gPressed = 0;
+window.addEventListener("keydown", (e) => {
+  const typing = e.target.matches("input, textarea, select");
+  if (e.key === "Escape") {
+    if (typing) { e.target.blur(); return; }
+    if (ui.keys) return toggleKeys(false);
+    if (ui.armed) { ui.armed = false; return rerender(); }
+    if (route.screen === "editor" && ui.edSel[route.id]) { ui.edSel[route.id] = null; return rerender(); }
+    if (route.screen === "run") return go("/");
+    if (route.screen === "editor") return ui.from?.screen === "run" ? go(`/runs/${ui.from.id}`) : go("/machines");
+    return;
+  }
+  if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === "?") return toggleKeys();
+  if (e.key === "g") { gPressed = Date.now(); return; }
+  if (Date.now() - gPressed < 900) { gPressed = 0; if (e.key === "r") return go("/"); if (e.key === "m") return go("/machines"); }
+  const lists = { runs: () => runsOrdered().length, machines: () => machineOrder.length };
+  if (["j", "k", "ArrowDown", "ArrowUp"].includes(e.key)) document.body.classList.add("kbd");
+  if (lists[route.screen]) {
+    const n = lists[route.screen](), k = route.screen;
+    if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); ui.sel[k] = Math.min(ui.sel[k] + 1, n - 1); rerender(); view.querySelector(`[data-i="${ui.sel[k]}"]`)?.scrollIntoView({ block: "nearest" }); }
+    if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); ui.sel[k] = Math.max(ui.sel[k] - 1, 0); rerender(); view.querySelector(`[data-i="${ui.sel[k]}"]`)?.scrollIntoView({ block: "nearest" }); }
+    if (e.key === "Enter" && !e.target.matches("a, button")) { view.querySelector(`[data-i="${ui.sel[k]}"]`)?.click(); }
+  }
+  if (route.screen === "editor" && machines[route.id] && (e.key === "j" || e.key === "k")) {
+    const order = ["about", ...Object.keys(machines[route.id].states)];
+    const i = order.indexOf(ui.edSel[route.id] ?? "") ;
+    ui.edSel[route.id] = order[e.key === "j" ? Math.min(i + 1, order.length - 1) : Math.max(i - 1, 0)];
+    rerender(); view.querySelector(`[data-blk="${ui.edSel[route.id]}"]`)?.scrollIntoView({ block: "nearest" });
+  }
+});
+document.addEventListener("pointerdown", () => document.body.classList.remove("kbd"));
+document.addEventListener("click", (e) => { if (ui.keys && !e.target.closest(".keys, #keys-btn")) toggleKeys(false); });
+
+render(true);
+</script>
+</body>
+</html>

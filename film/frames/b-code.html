@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="fonts.css">
+<style>
+  #stage { background: radial-gradient(1100px 760px at 26% 42%, #0e182e 0%, #0a0a0c 58%); }
+  .claim { position: absolute; left: 96px; top: 84px; font: 600 64px/1.02 var(--sans); letter-spacing: -0.04em; }
+  .claim .dim { color: var(--ink-3); }
+  .win { position: absolute; left: 96px; top: 280px; width: 820px; border-radius: 16px; background: #0f0f14; box-shadow: 0 0 0 1px #ffffff14, 0 40px 120px #00000099; overflow: hidden; }
+  .bar { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 18px; font: 400 13px var(--mono); color: var(--ink-3); border-bottom: 1px solid #ffffff0d; }
+  .bar i { width: 11px; height: 11px; border-radius: 50%; background: #2a2a31; } .bar span { margin-left: 10px; letter-spacing: .04em; }
+  pre { margin: 0; padding: 18px 26px 22px; font: 400 15.5px/1.55 var(--mono); color: var(--ink-2); counter-reset: ln; }
+  pre .l { display: block; position: relative; padding-left: 40px; margin: 0 -26px; padding-right: 26px; padding-left: 66px; } pre .l::before { counter-increment: ln; content: counter(ln); position: absolute; left: 26px; color: var(--ink-4); width: 22px; text-align: right; }
+  .k { color: var(--blue-hi); } .s { color: var(--ink); } .p { color: var(--ink-4); } .h { color: var(--amber-hi); } .hot { background: #3b82f61a; box-shadow: inset 3px 0 0 var(--blue); }
+  .term { position: absolute; left: 96px; top: 748px; width: 820px; font: 400 14px/1.9 var(--mono); color: var(--ink-3); }
+  .term b { color: var(--ink); font-weight: 500; } .term .ok { color: var(--green); } .term .no { color: var(--red); } .term .wt { color: var(--amber); } .term em { font-style: normal; color: var(--ink-4); }
+  .cap { position: absolute; right: 96px; top: 84px; text-align: right; font: 400 14px/1.9 var(--mono); color: var(--ink-3); letter-spacing: .06em; }
+  .cap b { color: var(--ink); font-weight: 500; }
+  svg.graph { position: absolute; left: 1060px; top: 300px; overflow: visible; }
+  .n rect { fill: #15151a; stroke: #4a4a53; stroke-width: 1.5; } .n text { font: 500 19px var(--mono); fill: var(--ink-2); text-anchor: middle; dominant-baseline: central; }
+  .n.lit rect { fill: var(--blue); stroke: none; } .n.lit text { fill: #0a0a0c; }
+  .n.wait rect { fill: var(--amber); stroke: none; } .n.wait text { fill: #0a0a0c; }
+  .e { fill: none; stroke: #4a4a53; stroke-width: 1.6; } .e.on { stroke: var(--blue-hi); } .e.human { stroke-dasharray: 6 5; stroke: var(--amber); opacity: .8; }
+  .el { font: 400 13px var(--mono); fill: var(--ink-3); } .el.on { fill: var(--blue-hi); } .el.hu { fill: var(--amber); }
+  .lead { fill: none; stroke: var(--blue-hi); stroke-width: 1; stroke-dasharray: 3 4; opacity: .7; }
+  .ring { fill: none; stroke: var(--amber); stroke-width: 2; }
+  .foot { position: absolute; left: 96px; bottom: 56px; font: 400 13px var(--mono); color: var(--ink-4); letter-spacing: .1em; }
+</style></head><body><div id="stage">
+<div class="claim">Prompts ask.<br><span class="dim">Machine enforces.</span></div>
+<div class="cap"><b>ship-fix</b> · rev c<br>run 8f2k · claude code<br><span style="color:var(--amber)">waiting on you</span></div>
+<div class="win"><div class="bar"><i></i><i></i><i></i><span>ship-fix.machine.json</span></div><pre><span class="l"><span class="p">{</span></span><span class="l">  <span class="k">"id"</span><span class="p">:</span> <span class="s">"ship-fix"</span><span class="p">,</span> <span class="k">"initial"</span><span class="p">:</span> <span class="s">"reproduce"</span><span class="p">,</span></span><span class="l">  <span class="k">"states"</span><span class="p">:</span> <span class="p">{</span></span><span class="l">    <span class="k">"reproduce"</span><span class="p">:</span> <span class="p">{</span> <span class="k">"on"</span><span class="p">:</span> <span class="p">{</span> <span class="k">"reproduced"</span><span class="p">:</span> <span class="s">"fix"</span> <span class="p">} },</span></span><span class="l">    <span class="k">"fix"</span><span class="p">:</span>       <span class="p">{</span> <span class="k">"on"</span><span class="p">:</span> <span class="p">{</span> <span class="k">"fixed"</span><span class="p">:</span> <span class="s">"test"</span> <span class="p">} },</span></span><span class="l">    <span class="k">"test"</span><span class="p">:</span>      <span class="p">{</span> <span class="k">"kind"</span><span class="p">:</span> <span class="s">"decision"</span><span class="p">,</span></span><span class="l">                   <span class="k">"on"</span><span class="p">:</span> <span class="p">{</span> <span class="k">"pass"</span><span class="p">:</span> <span class="s">"open_pr"</span><span class="p">,</span> <span class="k">"fail"</span><span class="p">:</span> <span class="s">"fix"</span> <span class="p">} },</span></span><span class="l">    <span class="k">"open_pr"</span><span class="p">:</span>   <span class="p">{</span> <span class="k">"on"</span><span class="p">:</span> <span class="p">{</span> <span class="k">"opened"</span><span class="p">:</span> <span class="s">"review"</span> <span class="p">} },</span></span><span class="l hot">    <span class="k">"review"</span><span class="p">:</span>    <span class="p">{</span> <span class="k">"kind"</span><span class="p">:</span> <span class="s">"wait"</span><span class="p">,</span></span><span class="l hot">                   <span class="k">"on"</span><span class="p">:</span> <span class="p">{</span> <span class="k">"approved"</span><span class="p">:</span> <span class="p">{</span> <span class="k">"to"</span><span class="p">:</span> <span class="s">"merged"</span><span class="p">,</span> <span class="k">"actor"</span><span class="p">:</span> <span class="h">"human"</span> <span class="p">},</span></span><span class="l hot">                           <span class="k">"changes"</span><span class="p">:</span>  <span class="p">{</span> <span class="k">"to"</span><span class="p">:</span> <span class="s">"fix"</span><span class="p">,</span>    <span class="k">"actor"</span><span class="p">:</span> <span class="h">"human"</span> <span class="p">} } },</span></span><span class="l">    <span class="k">"merged"</span><span class="p">:</span>    <span class="p">{</span> <span class="k">"kind"</span><span class="p">:</span> <span class="s">"final"</span> <span class="p">}</span></span><span class="l">  <span class="p">}</span></span><span class="l"><span class="p">}</span></span></pre></div>
+<div class="term">
+<div><b>▸ transition</b>("fixed")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ok">✓ ok</span> <em>·</em> test</div>
+<div><b>▸ transition</b>("merge")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="no">✗ rejected</span> <em>·</em> "merge" is not an event of open_pr</div>
+<div><b>▸ transition</b>("opened")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="wt">◌ waiting</span> <em>·</em> a person decides</div>
+</div>
+<div class="foot">MACHINE · STATE MACHINES FOR AGENTS · http://localhost:7420/mcp</div>
+<svg class="graph" width="760" height="420" viewBox="0 0 760 420">
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#93c2ff"/></marker>
+        <marker id="ahd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4a4a53"/></marker>
+        <marker id="ahh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#f2b45a"/></marker></defs>
+  <!-- row one, left to right -->
+  <path class="e on" marker-end="url(#ah)" d="M120,88 L230,88"/><text class="el on" x="175" y="74" text-anchor="middle">reproduced</text>
+  <path class="e on" marker-end="url(#ah)" d="M350,88 L460,88"/><text class="el on" x="405" y="74" text-anchor="middle">fixed</text>
+  <!-- fail: test back to fix, over the top -->
+  <path class="e" marker-end="url(#ahd)" d="M520,60 L520,22 L290,22 L290,60"/><text class="el" x="405" y="12" text-anchor="middle">fail</text>
+  <!-- pass: down to row two -->
+  <path class="e on" marker-end="url(#ah)" d="M520,116 L520,260"/><text class="el on" x="534" y="190">pass</text>
+  <!-- row two, right to left -->
+  <path class="e on" marker-end="url(#ah)" d="M460,288 L350,288"/><text class="el on" x="405" y="274" text-anchor="middle">opened</text>
+  <path class="e human" marker-end="url(#ahh)" d="M230,288 L120,288"/><text class="el hu" x="175" y="274" text-anchor="middle">approved</text>
+  <!-- changes · human: review straight up into fix -->
+  <path class="e human" marker-end="url(#ahh)" d="M290,260 L290,116"/><text class="el hu" x="304" y="190">changes · human</text>
+  <g class="n"><rect x="0" y="60" width="120" height="56" rx="12"/><text x="60" y="88">reproduce</text></g>
+  <g class="n"><rect x="230" y="60" width="120" height="56" rx="12"/><text x="290" y="88">fix</text></g>
+  <g class="n"><rect x="460" y="60" width="120" height="56" rx="12"/><text x="520" y="88">◇ test</text></g>
+  <g class="n lit"><rect x="460" y="260" width="120" height="56" rx="12"/><text x="520" y="288">open_pr</text></g>
+  <g class="n wait"><rect x="230" y="260" width="120" height="56" rx="12"/><text x="290" y="288">⌂ review</text></g>
+  <rect class="ring" x="222" y="252" width="136" height="72" rx="18"/>
+  <g class="n"><rect x="0" y="260" width="120" height="56" rx="28"/><text x="60" y="288">◉ merged</text></g>
+  <circle cx="420" cy="288" r="8" fill="#93c2ff" style="filter: drop-shadow(0 0 8px #93c2ff)"/>
+  <text class="el hu" x="290" y="350" text-anchor="middle">waiting on you · approve?</text>
+  <text class="el" x="580" y="390" text-anchor="end" style="fill:#ff5d62">✗ "merge" is not an event of open_pr</text>
+</svg>
+</div></body></html>

@@ -1,0 +1,118 @@
+{
+  "id": "changelog-draft",
+  "version": 1,
+  "name": "Draft a changelog entry",
+  "description": "Turn the commits since the last tag into a reviewed CHANGELOG.md entry.",
+  "inputs": {
+    "repo_path": {
+      "type": "string",
+      "required": true,
+      "description": "Absolute path to the git repository"
+    },
+    "version": {
+      "type": "string",
+      "required": true,
+      "description": "Version label for the entry, e.g. 0.4.0"
+    }
+  },
+  "requirements": [
+    {
+      "id": "git-repo",
+      "description": "repo_path is a git repository with at least one commit",
+      "check": "Run `git -C <repo_path> log -1 --oneline`; ok if it prints a commit"
+    },
+    {
+      "id": "author-set",
+      "description": "A file named .changelog-author in repo_path holds the preparer's name (used in the entry footer)",
+      "check": "Run `cat <repo_path>/.changelog-author`; ok if it prints a non-empty name"
+    }
+  ],
+  "initial": "collect",
+  "states": {
+    "collect": {
+      "kind": "task",
+      "title": "Collect commits",
+      "instructions": "List commits since the latest tag (all commits if there is no tag) with `git log --oneline`. Count them. Do not write anything yet.",
+      "output": {
+        "commit_count": {
+          "type": "number",
+          "required": true
+        },
+        "range": {
+          "type": "string",
+          "required": true,
+          "description": "The git range you used, e.g. v0.3.0..HEAD or HEAD"
+        }
+      },
+      "on": {
+        "collected": {
+          "to": "draft",
+          "description": "At least one commit found"
+        },
+        "nothing_to_release": {
+          "to": "empty",
+          "description": "No commits since the last tag"
+        }
+      }
+    },
+    "draft": {
+      "kind": "task",
+      "title": "Write the entry",
+      "instructions": "Create CHANGELOG.md in repo_path (top heading `# Changelog`) or prepend to it a section `## <version>` with one bullet per user-visible change, grouped under Added / Changed / Fixed as appropriate. End the section with a line `Prepared by: <name from .changelog-author>`. Do not commit.",
+      "output": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "description": "Absolute path to the file you wrote"
+        },
+        "bullets": {
+          "type": "number",
+          "required": true,
+          "description": "Number of bullets in the new section (not lines in the file)"
+        }
+      },
+      "on": {
+        "drafted": {
+          "to": "self_review"
+        }
+      }
+    },
+    "self_review": {
+      "kind": "decision",
+      "title": "Check the entry against the commits",
+      "instructions": "Re-read the commit list and the entry. Every commit must be represented or deliberately omitted (merge commits, chores). If anything is missing or wrong, go back and fix it.",
+      "output": {
+        "verdict": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "ok",
+            "revise"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "on": {
+        "ok": {
+          "to": "ready"
+        },
+        "revise": {
+          "to": "draft"
+        }
+      }
+    },
+    "ready": {
+      "kind": "final",
+      "title": "Ready for human review",
+      "outcome": "success"
+    },
+    "empty": {
+      "kind": "final",
+      "title": "Nothing to release",
+      "outcome": "success"
+    }
+  }
+}

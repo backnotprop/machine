@@ -1,0 +1,23 @@
+{
+  "name": "changelog-happy",
+  "machine": "examples/changelog-draft.machine.json",
+  "inputs": {
+    "repo_path": "$FIXTURE",
+    "version": "0.2.0"
+  },
+  "setup": "git init -q && git config user.email a@b.c && git config user.name t && echo '# demo' > README.md && git add -A && git commit -qm 'Initial project scaffold' && echo 'export const add=(a,b)=>a+b' > math.js && git add -A && git commit -qm 'Add math helper with add()' && git tag v0.1.0 && echo 'export const sub=(a,b)=>a-b' >> math.js && git add -A && git commit -qm 'Add sub() to math helper' && printf '# demo\\n\\nSee math.js\\n' > README.md && git add -A && git commit -qm 'Fix README pointing at the wrong file' && echo node_modules > .gitignore && git add -A && git commit -qm 'chore: add gitignore' && echo 'Trial Bot' > .changelog-author",
+  "expect": {
+    "status": "succeeded",
+    "state": "ready",
+    "max_rejected": 0,
+    "file_exists": [
+      "CHANGELOG.md"
+    ]
+  },
+  "judge": {
+    "question": "Does CHANGELOG.md have a `## 0.2.0` section that covers every user-visible commit after tag v0.1.0 (the sub() helper and the README fix), leaves out the gitignore chore, uses Added / Changed / Fixed groupings, and ends the section with `Prepared by: Trial Bot`?",
+    "files": [
+      "CHANGELOG.md"
+    ]
+  }
+}

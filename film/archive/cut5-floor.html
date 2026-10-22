@@ -1,0 +1,304 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="frames/fonts.css">
+<style>html,body{background:#000}#stage{background:#000}canvas{display:block}</style></head><body>
+<div id="stage"><canvas id="c" width="1920" height="1080"></canvas></div>
+<script>
+// machine · launch film. One canvas, one continuous take, 60 fps. window.__film = { duration, fps, seek(t) }.
+// The film opens on the state machine as a graph; the graph becomes the floor; the floor runs.
+const DURATION = 47, FPS = 60;
+const c = document.getElementById('c'), x = c.getContext('2d');
+const P = { page: '#0a0a0c', tile: '#0f0f13', tile2: '#121217', seam: '#18181e', ink: '#ededef', ink2: '#a3a3ad', ink3: '#85858f', ink4: '#4a4a53', g: '#3a3a42', glo: '#2e2e35', ghi: '#55555e', blue: '#3b82f6', bluehi: '#93c2ff', red: '#ff5d62', amber: '#f2b45a', green: '#6ee7a0', steel: '#1c1c22', steel2: '#24242b', steel3: '#2d2d35', dark: '#111115', rail: '#3d3d46', side: '#0e0e12' };
+const SANS = (w, s) => `${w} ${s}px "Geist Sans"`, MONO = (w, s) => `${w} ${s}px "Geist Mono"`;
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v)), lerp = (a, b, p) => a + (b - a) * p;
+const win = (t, a, b) => clamp((t - a) / (b - a));                       // 0→1 across [a,b]
+const io = p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;  // ease in-out cubic
+const out = p => 1 - Math.pow(1 - p, 3), back = p => { const s = 1.70158; return 1 + (s + 1) * Math.pow(p - 1, 3) + s * Math.pow(p - 1, 2); };
+const hash = (i, j, k = 0) => { let h = (i * 374761393 + j * 668265263 + k * 1274126177) | 0; h = Math.imul(h ^ (h >>> 13), 1103515245); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+const rr = (px, py, w, h, r) => { x.beginPath(); x.roundRect(px, py, w, h, r); };
+const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+const text = (s, px, py, { font = MONO(400, 12), color = P.ink3, align = 'left', base = 'middle', alpha = 1, track = 0 } = {}) => { if (alpha <= 0) return; x.save(); x.globalAlpha *= alpha; x.font = font; x.fillStyle = color; x.textAlign = align; x.textBaseline = base; x.letterSpacing = track + 'px'; x.fillText(s, px, py); x.restore(); };
+
+// ---------- the machine ----------
+const GY = 540, FY = 600, GW = 124, GH = 56, SW = 200, SH = 128, PITCH = 320, FX0 = 250;
+const ST = [
+  { id: 'plan', gx: 400, glyph: '', kind: 'task' }, { id: 'build', gx: 680, glyph: '', kind: 'task' }, { id: 'test', gx: 960, glyph: '◇', kind: 'decision' },
+  { id: 'review', gx: 1240, glyph: '⌂', kind: 'wait' }, { id: 'ship', gx: 1520, glyph: '◉', kind: 'final' },
+].map((s, i) => ({ ...s, i, fx: FX0 + i * PITCH }));
+const EDGES = [{ a: 0, b: 1, label: 'planned' }, { a: 1, b: 2, label: 'built' }, { a: 2, b: 3, label: 'pass' }, { a: 3, b: 4, label: 'approved', human: true }];
+// positions at morph m: centre, half width, half height
+const geo = (s, m) => ({ cx: lerp(s.gx, s.fx, m), cy: lerp(GY, FY, m), hw: lerp(GW / 2, SW / 2, m), hh: lerp(GH / 2, SH / 2, m) });
+
+// ---------- the timeline ----------
+const T = {
+  nodes: [0.6, 0.9, 1.2, 1.5, 1.8], edges: [1.9, 2.3, 2.7, 3.1], names: 4.9, machines: [6.0, 6.9, 7.8],
+  stateBeat: 9.0, transBeat: 10.0, gateBeat: 11.0, loop: 9.6, badge: 11.0,
+  morph: [11.9, 13.7], published: 13.8, skill: [14.3, 20.4],
+  dock: 17.4, spawn: 18.4, move1: [18.5, 20.2], g1: 19.3, work: [20.4, 27.0], allowed: 22.0, call: 24.2,
+  refuse: 27.0, g2no: 27.05, move2: [28.4, 30.0], g2ok: 29.2, scan: [30.1, 30.9], g3: 30.9, move3: [31.0, 32.6], g4wait: 32.7,
+  approve: 33.4, g4ok: 33.8, move4: [33.9, 35.5], landed: 35.5, wide: [36.9, 38.6], lines: [37.4, 38.8], plate: 38.0, roll: [39.0, 39.8],
+  brand: 40.6, tag: 42.4, url: 44.0, fade: [46.0, 47],
+};
+const CAPTIONS = [[0.8, 'State machines for agents.'], [4.6, 'You design the workflow.'], [9.0, 'Every state, every transition, every gate.'], [13.4, 'Publish it. It becomes a skill.'], [16.9, 'Agents report every move over MCP.'], [21.5, 'The machine decides what\'s allowed next.'], [24.2, 'The agent decides how.'], [27.0, 'Off the map? Rejected.'], [30.9, 'A human gate? It waits.'], [33.4, 'Determinism where you need it. Emergence where agents shine.'], [36.9, 'Organize your machines. Account for every run.'], [40.5, '']];
+const CONSOLE = [[T.dock, 'claude code · loaded SKILL.md · release-plannotator', 'ink'], [T.spawn, 'begin()  →  run_8f2k · plan', 'ink'], [T.g1, 'transition("planned")  ✓ ok  ·  build', 'ok'], [T.allowed, 'allowed next: built', 'dim'], [T.refuse + .1, 'transition("ship")  ✗ rejected  ·  "ship" is not an event of build', 'no'], [T.g2ok, 'transition("built")  ✓ ok  ·  test', 'ok'], [T.g3, 'transition("pass")  ✓ ok  ·  review', 'ok'], [T.g4wait, 'transition("opened")  ◌ waiting  ·  a person decides', 'wait'], [T.approve + .2, 'approved · by you', 'ok'], [T.landed, 'run_8f2k  ·  ship  ◉  done', 'ok']];
+const CAM = [[0, 960, 560, 1.3], [11.6, 960, 560, 1.3], [13.7, 960, 600, 1], [16.9, 960, 600, 1], [18.3, 520, 620, 1.55], [28.0, 520, 620, 1.55], [31.0, 1020, 620, 1.55], [33.6, 1020, 620, 1.55], [35.2, 1230, 620, 1.55], [36.9, 1230, 620, 1.55], [38.6, 960, 620, .94], [47, 960, 620, .94]];
+function cam(t) { let k = 0; while (k < CAM.length - 2 && t >= CAM[k + 1][0]) k++; const a = CAM[k], b = CAM[k + 1], p = io(win(t, a[0], b[0])); return { cx: lerp(a[1], b[1], p), cy: lerp(a[2], b[2], p), z: lerp(a[3], b[3], p) }; }
+const morph = t => io(win(t, ...T.morph));
+
+// ---------- floor ----------
+const TILE = 40, FLOOR = { x: 72, y: 250, w: 1776, h: 760 };
+function floor(m, t) {
+  if (m <= 0) return;
+  const cols = FLOOR.w / TILE, rows = FLOOR.h / TILE, cc = 540, cr = 600, maxd = 1100;
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const px = FLOOR.x + i * TILE, py = FLOOR.y + j * TILE, v = hash(i, j);
+    const d = Math.hypot(px + 20 - cc, py + 20 - cr), a = clamp((m * 1.7 - d / maxd * 0.7) / 0.5);
+    if (a <= 0) continue;
+    x.globalAlpha = a;
+    x.fillStyle = v < .12 ? P.tile2 : P.tile; x.fillRect(px, py, TILE, TILE);
+    x.strokeStyle = P.seam; x.lineWidth = 1; x.strokeRect(px + .5, py + .5, TILE - 1, TILE - 1);
+    if (v > .93) { x.fillStyle = '#1a1a21'; x.fillRect(px + 8 + (v * 20 | 0), py + 8 + (hash(j, i) * 20 | 0), 4, 4); }
+    if (v > .985) { x.fillStyle = '#0c0c0f'; x.fillRect(px + 6, py + 6, TILE - 12, TILE - 12); }
+  }
+  x.globalAlpha = m;
+  for (let k = 0; k < 2; k++) { const py = FLOOR.y + 12 + k * 14; x.fillStyle = k ? P.g : P.glo; x.fillRect(FLOOR.x, py, FLOOR.w, 6); for (let i = 0; i < FLOOR.w; i += 160) { x.fillStyle = P.ghi; x.fillRect(FLOOR.x + i + 70, py - 2, 10, 10); } }
+  x.fillStyle = P.glo; x.fillRect(FLOOR.x + FLOOR.w - 24, FLOOR.y, 8, FLOOR.h); for (let j = 0; j < FLOOR.h; j += 48) { x.fillStyle = P.ghi; x.fillRect(FLOOR.x + FLOOR.w - 28, FLOOR.y + j + 20, 16, 4); }
+  x.save(); x.setLineDash([16, 12]); x.strokeStyle = P.ink4; x.lineWidth = 2; x.globalAlpha = m * .5; x.beginPath(); x.moveTo(FLOOR.x + 60, FLOOR.y + FLOOR.h - 50); x.lineTo(FLOOR.x + FLOOR.w - 60, FLOOR.y + FLOOR.h - 50); x.stroke(); x.restore();
+  x.globalAlpha = 1;
+}
+
+// ---------- belts & edges ----------
+function belt(pts, m, t, { draw = 1, label, labelAt, alpha = 1, human = false } = {}) {
+  if (draw <= 0 || alpha <= 0) return;
+  // the polyline, cut to `draw`
+  const segs = []; let L = 0; for (let i = 0; i < pts.length - 1; i++) { const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); segs.push(l); L += l; }
+  const cut = L * draw, path = () => { x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); let acc = 0; for (let i = 0; i < segs.length; i++) { if (acc + segs[i] <= cut) { x.lineTo(pts[i + 1][0], pts[i + 1][1]); acc += segs[i]; } else { const p = (cut - acc) / segs[i]; x.lineTo(lerp(pts[i][0], pts[i + 1][0], p), lerp(pts[i][1], pts[i + 1][1], p)); break; } } };
+  x.save(); x.globalAlpha = alpha; x.lineJoin = 'round'; x.lineCap = 'butt';
+  if (m < 1) { // the graph edge
+    x.globalAlpha = alpha * (1 - m); x.strokeStyle = human ? P.amber : P.bluehi; x.lineWidth = 1.8; if (human) x.setLineDash([6, 5]); path(); x.stroke(); x.setLineDash([]);
+    if (draw >= 1) { const [ex, ey] = pts[pts.length - 1], [sx, sy] = pts[pts.length - 2], a = Math.atan2(ey - sy, ex - sx); x.fillStyle = human ? P.amber : P.bluehi; x.beginPath(); x.moveTo(ex, ey); x.lineTo(ex - 9 * Math.cos(a - .45), ey - 9 * Math.sin(a - .45)); x.lineTo(ex - 9 * Math.cos(a + .45), ey - 9 * Math.sin(a + .45)); x.fill(); }
+  }
+  if (m > 0) { // the belt
+    x.globalAlpha = alpha * m;
+    path(); x.strokeStyle = 'rgba(0,0,0,.6)'; x.lineWidth = lerp(2, 38, m); x.stroke();
+    path(); x.strokeStyle = P.rail; x.lineWidth = lerp(1.8, 32, m); x.stroke();
+    path(); x.strokeStyle = P.dark; x.lineWidth = lerp(1, 24, m); x.stroke();
+    const off = (t * 54) % 18;
+    let acc = 0;
+    for (let s = 0; s < pts.length - 1; s++) {
+      const [ax, ay] = pts[s], [bx, by] = pts[s + 1], l = segs[s], ux = (bx - ax) / l, uy = (by - ay) / l;
+      for (let d = off + ((18 - acc % 18) % 18); d < l - 6; d += 18) { if (acc + d > cut) break; const cx = ax + ux * d, cy = ay + uy * d; x.strokeStyle = rgba(P.bluehi, .28 * m); x.lineWidth = 2; x.beginPath(); x.moveTo(cx - ux * 5 - uy * 7, cy - uy * 5 + ux * 7); x.lineTo(cx + ux * 2, cy + uy * 2); x.lineTo(cx - ux * 5 + uy * 7, cy - uy * 5 - ux * 7); x.stroke(); }
+      for (let d = 0; d <= l; d += 90) { const cx = ax + ux * d, cy = ay + uy * d; x.fillStyle = P.ghi; x.fillRect(cx - uy * 18 - 2, cy + ux * 18 - 2, 4, 4); x.fillRect(cx + uy * 18 - 2, cy - ux * 18 - 2, 4, 4); }
+      acc += l;
+    }
+  }
+  x.restore();
+  if (label && draw >= 1) { const [lx, ly] = labelAt; text(label, lx, lerp(ly - 14, ly + 32, m), { font: MONO(400, lerp(13, 12, m)), color: m < .5 ? (human ? P.amber : P.bluehi) : P.ink3, align: 'center', alpha }); }
+}
+const exitOf = (s, m) => { const g = geo(s, m); return [g.cx + g.hw, g.cy]; }, enterOf = (s, m) => { const g = geo(s, m); return [g.cx - g.hw, g.cy]; };
+function edges(m, t) {
+  EDGES.forEach((e, i) => { const a = exitOf(ST[e.a], m), b = enterOf(ST[e.b], m); belt([a, b], m, t, { draw: out(win(t, T.edges[i], T.edges[i] + .5)), label: e.label, labelAt: [(a[0] + b[0]) / 2, a[1]], human: e.human }); });
+  // the fail loop: test back to build, under the line
+  const gb = geo(ST[1], m), gt = geo(ST[2], m), drop = lerp(90, 150, m), ox = lerp(0, 10, m);
+  belt([[gt.cx + ox, gt.cy + gt.hh], [gt.cx + ox, gt.cy + drop], [gb.cx + ox, gb.cy + drop], [gb.cx + ox, gb.cy + gb.hh]], m, t, { draw: out(win(t, T.loop, T.loop + .8)), label: 'fail', labelAt: [(gt.cx + gb.cx) / 2, gb.cy + drop + lerp(10, 2, m)] });
+}
+
+// ---------- items ----------
+function item(px, py, col = P.bluehi, a = 1) {
+  if (a <= 0) return; x.save(); x.globalAlpha = a;
+  x.fillStyle = 'rgba(0,0,0,.5)'; x.fillRect(px - 8, py - 4, 16, 16);
+  x.shadowColor = col; x.shadowBlur = 18; x.fillStyle = col; x.fillRect(px - 8, py - 8, 16, 16); x.shadowBlur = 0;
+  x.fillStyle = 'rgba(255,255,255,.45)'; x.fillRect(px - 8, py - 8, 16, 3); x.fillStyle = 'rgba(0,0,0,.35)'; x.fillRect(px - 8, py + 5, 16, 3); x.restore();
+}
+// the run's part: where it is at t, or null when it is inside a station
+function partPos(t) {
+  const ex = i => ST[i].fx + SW / 2, en = i => ST[i].fx - SW / 2, y = FY;
+  const ride = (i, [t0, t1]) => { const p = win(t, t0, t1); return [lerp(ex(i) - 30, en(i + 1) + 30, p), y]; };
+  if (t >= T.spawn && t < T.move1[0]) return [ex(0) - 30 + 0, y];
+  if (t >= T.move1[0] && t < T.move1[1]) return ride(0, T.move1);
+  if (t >= T.refuse && t < T.refuse + .9) { const u = t - T.refuse, d = u < .35 ? out(u / .35) * 48 : 48 * (1 - io(win(u, .4, .9))); return [ex(1) - 30 + d, y]; }
+  if (t >= T.move2[0] && t < T.move2[1]) return ride(1, T.move2);
+  if (t >= T.move3[0] && t < T.move3[1]) return ride(2, T.move3);
+  if (t >= T.move4[0] && t < T.move4[1]) return ride(3, T.move4);
+  return null;
+}
+const inside = (t, i) => (i === 1 && ((t >= T.move1[1] && t < T.refuse) || (t >= T.refuse + .9 && t < T.move2[0]))) || (i === 2 && t >= T.move2[1] && t < T.move3[0]) || (i === 3 && t >= T.move3[1] && t < T.move4[0]) || (i === 4 && t >= T.move4[1]);
+
+// ---------- stations ----------
+const lampOf = (s, t) => {
+  if (s.i === 0) return t >= T.dock ? P.blue : P.green;
+  if (s.i === 1) return inside(t, 1) ? P.blue : P.green;
+  if (s.i === 2) return inside(t, 2) ? P.bluehi : P.green;
+  if (s.i === 3) return t >= T.move3[1] && t < T.approve ? P.amber : t >= T.approve ? P.green : P.amber;
+  return t >= T.landed ? P.bluehi : P.ink4;
+};
+function screen(s, sx, sy, w, h, t) {
+  x.save(); x.beginPath(); x.rect(sx - 6, sy - 10, w + 12, h + 16); x.clip();
+  const line = (str, k, col = P.ink3, f = MONO(400, 11)) => text(str, sx, sy + 10 + k * 14, { font: f, color: col });
+  if (s.i === 0) { if (t < T.dock) { [1, .7, .5, .9].forEach((f, i) => { x.fillStyle = i < 2 ? P.ink3 : P.ink4; x.fillRect(sx, sy + i * 11, w * f * .8, 4); }); } else { line('✱ claude code', 0, P.bluehi, MONO(500, 12)); line('SKILL.md · loaded', 1); line(t >= T.spawn ? 'begin() → run_8f2k' : 'begin()', 2); if (t >= T.spawn) line('planned ✓', 3, P.green); } }
+  if (s.i === 1) { const w0 = T.work[0]; if (t < w0) { [1, .6, .8].forEach((f, i) => { x.fillStyle = P.ink4; x.fillRect(sx, sy + i * 11, w * f * .8, 4); }); } else { line('✱ claude code', 0, P.bluehi, MONO(500, 12)); const L = [['edit refund.ts', w0 + .5], ['bun test · 42 ok', w0 + 2.2], ['commit a81f2c', w0 + 4.2]]; L.forEach(([str, at], k) => { if (t >= at) line(str, k + 1, t < at + .5 ? P.ink : P.ink3); }); if (t >= T.refuse && t < T.refuse + 1.2) line('ship? ✗', 4, P.red, MONO(500, 11)); if (t >= T.move2[0] - .6 && t < T.move2[0] + .6) line('built ✓', 4, P.green, MONO(500, 11)); } }
+  if (s.i === 2) { const on = t >= T.scan[0]; [['✓ unit · 42', .0], ['✓ types', .3], ['✓ e2e · 3', .6]].forEach(([str, d], k) => { if (on && t >= T.scan[0] + d) line(str, k, P.green); else line(k === 2 ? '· e2e' : k === 1 ? '· types' : '· unit', k, P.ink4); }); if (on && t < T.scan[1]) { const p = win(t, ...T.scan), yy = sy - 8 + p * (h + 12); x.save(); x.shadowColor = P.green; x.shadowBlur = 12; x.fillStyle = P.green; x.fillRect(sx - 6, yy, w + 12, 2); x.restore(); } }
+  if (s.i === 3) { const waiting = t >= T.move3[1] && t < T.approve, done = t >= T.approve, col = waiting ? P.amber : done ? P.green : P.ink4; x.strokeStyle = col; x.lineWidth = 2; x.beginPath(); x.arc(sx + 12, sy + 8, 6, 0, 7); x.stroke(); x.beginPath(); x.arc(sx + 12, sy + 30, 11, Math.PI, 0); x.stroke(); if (waiting || done) { text(done ? 'approved' : 'waiting', sx + 32, sy + 6, { color: col, font: MONO(500, 11) }); text(done ? 'by you' : 'on you', sx + 32, sy + 20, { color: P.ink3, font: MONO(400, 11) }); const pr = done ? out(win(t, T.approve, T.approve + .25)) : 0; x.fillStyle = col; x.fillRect(sx + 32, sy + 29 + pr, 70, 13 - pr); text(done ? 'approved ✓' : 'approve', sx + 36, sy + 36, { color: P.page, font: MONO(500, 10) }); } else { text('a person', sx + 32, sy + 8, { color: P.ink4, font: MONO(400, 11) }); text('decides', sx + 32, sy + 22, { color: P.ink4, font: MONO(400, 11) }); } }
+  if (s.i === 4) { const on = t >= T.landed, f = on ? out(win(t, T.landed, T.landed + .5)) : 0; x.save(); if (on) { x.shadowColor = P.bluehi; x.shadowBlur = 10 + 16 * f; } x.fillStyle = on ? P.bluehi : P.steel3; x.fillRect(sx + 4, sy + 4, 30, 30); x.restore(); text(on ? 'v2.4.1' : '—', sx + 44, sy + 10, { color: on ? P.ink : P.ink4, font: MONO(500, 11) }); if (on) text('↑ npm · tagged', sx + 44, sy + 26, { color: P.ink3, font: MONO(400, 11) }); }
+  x.restore();
+}
+function station(s, m, t) {
+  const g = geo(s, m), px = g.cx - g.hw, py = g.cy - g.hh, w = g.hw * 2, h = g.hh * 2, r = lerp(12, 7, m);
+  const pop = back(win(t, T.nodes[s.i], T.nodes[s.i] + .45)); if (pop <= 0) return;
+  x.save(); x.translate(g.cx, g.cy); x.scale(pop, pop); x.translate(-g.cx, -g.cy);
+  // the graph node (fades to the machine)
+  if (m < 1) {
+    x.globalAlpha = 1 - m; x.save(); x.shadowColor = 'rgba(0,0,0,.6)'; x.shadowBlur = 20; x.shadowOffsetY = 6; x.fillStyle = '#15151a'; rr(px, py, w, h, r); x.fill(); x.restore();
+    const beat = t >= T.stateBeat && t < T.stateBeat + 1.2 ? Math.max(0, 1 - Math.abs((t - T.stateBeat - s.i * .18) * 4)) : 0;
+    x.strokeStyle = beat > 0 ? rgba(P.bluehi, .35 + .65 * beat) : P.ghi; x.lineWidth = 1.5 + beat; rr(px + .5, py + .5, w - 1, h - 1, r); x.stroke();
+    const nm = t >= T.names + s.i * .12 ? (s.glyph && t >= T.badge + (s.i - 2) * .3 ? s.glyph + ' ' : '') + s.id : '';
+    text(nm, g.cx, g.cy, { font: MONO(500, 18), color: P.ink2, align: 'center', alpha: 1 - m });
+    if (t >= T.badge + (s.i - 2) * .3 && s.kind === 'wait') { x.globalAlpha = 1 - m; x.strokeStyle = P.amber; x.lineWidth = 2; rr(px - 7, py - 7, w + 14, h + 14, r + 6); x.stroke(); }
+  }
+  // the machine
+  if (m > 0) {
+    x.globalAlpha = m;
+    x.fillStyle = P.side; rr(px, py + 10, w, h, r); x.fill();                                   // the south face: height
+    x.save(); x.shadowColor = 'rgba(0,0,0,.8)'; x.shadowBlur = 30; x.shadowOffsetY = 14; x.fillStyle = P.steel; rr(px, py, w, h, r); x.fill(); x.restore();
+    x.strokeStyle = P.ghi; x.lineWidth = 1.5; rr(px + .5, py + .5, w - 1, h - 1, r); x.stroke();
+    x.fillStyle = P.steel2; rr(px + 8, py + 8, w - 16, h - 16, 4); x.fill(); x.strokeStyle = P.glo; x.lineWidth = 1; rr(px + 8.5, py + 8.5, w - 17, h - 17, 4); x.stroke();
+    for (const [bx, by] of [[px + 10, py + 10], [px + w - 10, py + 10], [px + 10, py + h - 10], [px + w - 10, py + h - 10]]) { x.fillStyle = P.ghi; x.beginPath(); x.arc(bx, by, 2.8, 0, 7); x.fill(); x.fillStyle = P.dark; x.fillRect(bx - 2.4, by - .7, 4.8, 1.4); }
+    const lamp = lampOf(s, t), pulse = .75 + .25 * Math.sin(t * 5 + s.i);
+    x.save(); x.shadowColor = lamp; x.shadowBlur = 14 + 10 * pulse; x.fillStyle = lamp; x.beginPath(); x.arc(px + 24, py + 24, 5.5, 0, 7); x.fill(); x.restore();
+    x.fillStyle = P.dark; rr(px + 42, py + 16, w - 56, h - 66, 4); x.fill(); x.strokeStyle = P.glo; rr(px + 42.5, py + 16.5, w - 57, h - 67, 4); x.stroke();
+    screen(s, px + 52, py + 28, w - 76, h - 90, t);
+    x.fillStyle = P.dark; rr(px + 14, py + h - 38, w - 28, 26, 3); x.fill();
+    text((s.glyph ? s.glyph + ' ' : '') + s.id, px + 26, py + h - 25, { font: MONO(500, 15), color: P.ink });
+    // the bay: the part inside, seen through a slot at belt level
+    if (inside(t, s.i) && s.i !== 4) { x.save(); x.shadowColor = P.bluehi; x.shadowBlur = 16; x.fillStyle = rgba(P.bluehi, .9); x.fillRect(px + w - 12, g.cy - 6, 6, 12); x.restore(); }
+  }
+  x.restore();
+}
+// under the working station: welding light and sparks
+function work(t) {
+  if (!(t >= T.work[0] && t < T.move2[0])) return; const s = ST[1], g = geo(s, 1), f = Math.min(1, win(t, T.work[0], T.work[0] + .6), win(T.move2[0], t, t - .4) || 1);
+  const flick = .6 + .4 * (hash(Math.floor(t * 30), 7) * .6 + .4 * Math.sin(t * 23));
+  const gr = x.createRadialGradient(g.cx, g.cy + 70, 10, g.cx, g.cy + 70, 230); gr.addColorStop(0, rgba(P.blue, .22 * flick * f)); gr.addColorStop(1, rgba(P.blue, 0)); x.fillStyle = gr; x.fillRect(g.cx - 240, g.cy - 170, 480, 480);
+  for (let k = 0; k < 14; k++) { const age = (t * 1.6 + k * .173) % 1, seed = Math.floor(t * 1.6 + k * .173), vx = (hash(k, seed) - .5) * 160, vy = -60 - hash(seed, k) * 90; const px = g.cx + g.hw - 6 + vx * age, py = g.cy + 40 + vy * age + 260 * age * age; x.fillStyle = k % 3 ? P.amber : '#fff'; x.globalAlpha = (1 - age) * f; x.fillRect(px, py, 2, 2); }
+  x.globalAlpha = 1;
+}
+// gates: an inserter arm over each belt, a lamp that says OK / NO / WAIT
+const GATES = [{ e: 0, at: 0.5 }, { e: 1, at: 0.4 }, { e: 2, at: 0.5 }, { e: 3, at: 0.5 }];
+const gateState = (i, t) => {
+  if (i === 0) return t >= T.g1 ? ['ok', T.g1] : ['idle'];
+  if (i === 1) return t >= T.g2ok ? ['ok', T.g2ok] : t >= T.g2no ? ['no', T.g2no] : ['idle'];
+  if (i === 2) return t >= T.g3 ? ['ok', T.g3] : ['idle'];
+  return t >= T.g4ok ? ['ok', T.g4ok] : t >= T.g4wait ? ['wait', T.g4wait] : ['idle'];
+};
+function gates(m, t) {
+  if (m <= 0) return; x.save(); x.globalAlpha = m;
+  GATES.forEach((gt, i) => {
+    const e = EDGES[gt.e], a = exitOf(ST[e.a], 1), b = enterOf(ST[e.b], 1), px = lerp(a[0], b[0], gt.at), py = a[1];
+    const [st, at = 0] = gateState(i, t), age = t - at, hot = st !== 'idle' && age < 1.4;
+    const col = st === 'ok' ? P.green : st === 'no' ? P.red : st === 'wait' ? P.amber : P.ink4, bright = st === 'wait' ? .6 + .4 * Math.sin(t * 6) : st === 'idle' ? .5 : hot ? 1 : .7;
+    x.fillStyle = P.side; rr(px - 11, py - 50, 22, 22, 3); x.fill();
+    x.fillStyle = P.steel; rr(px - 11, py - 60, 22, 22, 3); x.fill(); x.strokeStyle = P.ghi; x.lineWidth = 1; rr(px - 10.5, py - 59.5, 21, 21, 3); x.stroke();
+    const swing = hot ? Math.sin(Math.min(age, .6) / .6 * Math.PI) * (st === 'no' ? -.55 : .55) : 0;
+    x.save(); x.translate(px, py - 40); x.rotate(swing); x.strokeStyle = P.ink2; x.lineWidth = 3; x.lineCap = 'round'; x.beginPath(); x.moveTo(0, 0); x.lineTo(0, 26); x.stroke(); x.fillStyle = P.ink2; x.fillRect(-7, 24, 14, 4); x.restore();
+    x.save(); x.shadowColor = col; x.shadowBlur = st === 'idle' ? 0 : 10 + 14 * bright; x.fillStyle = rgba(col, bright); x.beginPath(); x.arc(px, py - 49, 4.5, 0, 7); x.fill(); x.restore();
+    if (st !== 'idle') { const pg = x.createRadialGradient(px, py, 2, px, py, 46); pg.addColorStop(0, rgba(col, .35 * bright)); pg.addColorStop(1, rgba(col, 0)); x.fillStyle = pg; x.fillRect(px - 46, py - 46, 92, 92); }
+    if (st !== 'idle') text(st === 'ok' ? 'OK' : st === 'no' ? 'NO' : 'WAIT', px, py - 74, { font: MONO(500, 10), color: col, align: 'center', alpha: bright });
+    if (st === 'no' && age < 1.0) { x.save(); x.globalAlpha = (1 - age) * .9; x.strokeStyle = P.red; x.lineWidth = 2; x.beginPath(); x.arc(px, py, 18 + age * 40, 0, 7); x.stroke(); x.restore(); }
+  });
+  x.restore();
+}
+// callouts in world space
+function callouts(m, t) {
+  if (m < 1) return; const b = geo(ST[1], 1);
+  const bubble = (lines, px, py, col, a) => { if (a <= 0) return; x.save(); x.globalAlpha = a; const w = 196, h = 14 + lines.length * 16; x.fillStyle = rgba('#0a0a0c', .92); rr(px, py, w, h, 4); x.fill(); x.strokeStyle = col; x.lineWidth = 1; rr(px + .5, py + .5, w - 1, h - 1, 4); x.stroke(); lines.forEach((l, k) => text(l, px + 10, py + 15 + k * 16, { font: MONO(k ? 400 : 500, 11), color: k ? P.ink2 : col })); x.restore(); };
+  bubble(['server · allowed next', 'built'], b.cx - 98, b.cy - 128, P.bluehi, out(win(t, T.allowed, T.allowed + .4)) * (1 - win(t, T.refuse - .3, T.refuse)));
+  bubble(['the agent\'s call', 'edit · test · commit'], b.cx + 100, b.cy - 128, P.ink, out(win(t, T.call, T.call + .4)) * (1 - win(t, T.refuse - .3, T.refuse)));
+  bubble(['✗ rejected', '"ship" is not an event of build'], b.cx - 98, b.cy - 128, P.red, out(win(t, T.refuse + .1, T.refuse + .4)) * (1 - win(t, T.move2[0] - .4, T.move2[0])));
+  const r = geo(ST[3], 1);
+  bubble(['◌ waiting on you', 'a person decides'], r.cx - 98, r.cy - 128, P.amber, out(win(t, T.g4wait, T.g4wait + .4)) * (1 - win(t, T.approve, T.approve + .3)));
+  bubble(['✓ approved · by you', 'the gate opens'], r.cx - 98, r.cy - 128, P.green, out(win(t, T.approve + .2, T.approve + .5)) * (1 - win(t, T.landed - .3, T.landed)));
+}
+// other lines, for the wide shot
+function otherLines(t) {
+  const zf = clamp((1.25 - cam(t).z) / .25), a = (.3 * out(win(t, 13.2, 14.2)) + .2 * out(win(t, ...T.lines))) * zf; if (a <= 0) return;
+  x.save(); x.globalAlpha *= a;
+  const line = (name, run, y, names, items, lamps) => {
+    const xs = names.map((_, i) => 360 + i * 300);
+    for (let i = 0; i < xs.length - 1; i++) belt([[xs[i] + 90, y], [xs[i + 1] - 90, y]], 1, t);
+    items.forEach(([i, ph]) => { const p = ((t * .35 + ph) % 1); item(lerp(xs[i] + 60, xs[i + 1] - 60, p), y); });
+    names.forEach((nm, i) => { const px = xs[i] - 90, py = y - 64; x.fillStyle = P.side; rr(px, py + 10, 180, 128, 7); x.fill(); x.fillStyle = P.steel; rr(px, py, 180, 128, 7); x.fill(); x.strokeStyle = P.ghi; x.lineWidth = 1.5; rr(px + .5, py + .5, 179, 127, 7); x.stroke(); x.fillStyle = P.steel2; rr(px + 8, py + 8, 164, 112, 4); x.fill(); x.fillStyle = P.dark; rr(px + 42, py + 16, 96, 62, 4); x.fill(); rr(px + 14, py + 90, 152, 26, 3); x.fill(); text(nm, px + 26, py + 103, { font: MONO(500, 15), color: P.ink }); x.save(); x.shadowColor = lamps[i]; x.shadowBlur = 16; x.fillStyle = lamps[i]; x.beginPath(); x.arc(px + 24, py + 24, 5.5, 0, 7); x.fill(); x.restore(); });
+    text(name + ' · ' + run, xs[0] - 90, y - 86, { font: MONO(500, 12), color: P.ink3 });
+  };
+  line('code-review-loop', 'run 7c1d', 380, ['triage', '⌂ review', 'changes', '◉ merge'], [[0, .2], [1, .7]], [P.green, P.amber, P.blue, P.green]);
+  line('migrate-db', 'run 6b90', 880, ['snapshot', 'dry_run', '◇ verify', 'cut_over'], [[0, .5], [2, .1]], [P.green, P.blue, P.green, P.ink4]);
+  x.restore();
+}
+
+// ---------- HUD (screen space) ----------
+function hud(t) {
+  const a0 = win(t, .4, 1.0);
+  // wordmark + caption
+  text('machine', 72, 78, { font: SANS(600, 40), color: P.ink, alpha: a0, track: -1.5 });
+  const cap = CAPTIONS.filter(c => c[0] <= t).pop(); if (cap && cap[1]) { const a = win(t, cap[0], cap[0] + .35); text(cap[1], 72, 122, { font: SANS(500, 22), color: P.ink2, alpha: a, track: -.3 }); }
+  const sub = t >= T.published ? 'release-plannotator  ·  rev c  ·  published' : t >= T.names ? 'release-plannotator  ·  draft' : 'untitled  ·  draft';
+  text(sub.toUpperCase(), 72, 156, { font: MONO(400, 12), color: t >= T.published ? P.green : P.bluehi, alpha: win(t, 1.6, 2.1), track: 2.2 });
+  if (t >= T.dock) text('RUN 8F2K  ·  CLAUDE CODE  ·  LIVE', 72, 178, { font: MONO(400, 12), color: P.ink3, alpha: win(t, T.dock, T.dock + .4), track: 2.2 });
+  // the machines list (designing) → top right
+  const ML = [['release-plannotator', T.machines[0]], ['code-review-loop', T.machines[1]], ['migrate-db', T.machines[2]]];
+  const listA = Math.min(win(t, T.machines[0], T.machines[0] + .3), 1 - win(t, T.morph[0], T.morph[0] + .5)) + win(t, T.lines[0], T.lines[0] + .5) * (1 - win(t, T.brand, T.brand + .5));
+  if (listA > 0) { text('MACHINES', 1848, 78, { font: MONO(400, 12), color: P.ink4, align: 'right', alpha: listA, track: 2.2 }); ML.forEach(([nm, at], k) => { const on = t >= T.lines[0] ? k === 0 || t >= T.lines[0] + .3 * k : t >= at; if (!on) return; const a = listA * win(t, at, at + .3); text(nm, 1848, 104 + k * 22, { font: MONO(k === 0 ? 500 : 400, 14), color: k === 0 ? P.ink : P.ink2, align: 'right', alpha: a }); if (t >= T.lines[0]) text(['1,284 runs', '318 runs', '41 runs'][k], 1848 - 220, 104 + k * 22, { font: MONO(400, 12), color: P.ink4, align: 'right', alpha: a }); }); }
+  // the SKILL card
+  const sk = Math.min(out(win(t, T.skill[0], T.skill[0] + .5)), 1 - win(t, T.skill[1], T.skill[1] + .4));
+  if (sk > 0) { x.save(); x.globalAlpha = sk; const px = 1480 + (1 - sk) * 40, py = 64, w = 368, h = 236; x.shadowColor = 'rgba(0,0,0,.7)'; x.shadowBlur = 30; x.fillStyle = '#0f0f14'; rr(px, py, w, h, 8); x.fill(); x.shadowBlur = 0; x.strokeStyle = P.ghi; x.lineWidth = 1; rr(px + .5, py + .5, w - 1, h - 1, 8); x.stroke();
+    text('SKILL.md', px + 20, py + 24, { font: MONO(500, 13), color: P.ink }); text('release-plannotator · rev c', px + 100, py + 24, { font: MONO(400, 12), color: P.bluehi });
+    const rows = [['begin', 'inputs', '→ the first state'], ['transition', 'run_id, event', '→ the next, or rejected'], ['fail', 'run_id, code', '→ blocked, with needs']];
+    rows.forEach(([a, b, c2], k) => { const y = py + 58 + k * 22; text(a, px + 20, y, { font: MONO(500, 12), color: P.ink }); text(b, px + 110, y, { font: MONO(400, 12), color: P.ink3 }); text(c2, px + 214, y, { font: MONO(400, 11), color: P.ink4 }); });
+    text('Fire only events on the current state.', px + 20, py + 138, { font: MONO(400, 12), color: P.ink2 }); text('Anything else is rejected.', px + 20, py + 156, { font: MONO(400, 12), color: P.ink2 });
+    text('A wait state holds until a person decides.', px + 20, py + 174, { font: MONO(400, 12), color: P.ink2 });
+    text('mcp  http://localhost:7420/mcp', px + 20, py + 210, { font: MONO(400, 12), color: P.bluehi }); x.restore(); }
+  // the console
+  const lines = CONSOLE.filter(l => l[0] <= t).slice(-4), cA = 1 - win(t, T.brand - .3, T.brand);
+  lines.forEach((l, k) => { const a = win(t, l[0], l[0] + .25) * cA, y = 1000 - (lines.length - 1 - k) * 22, col = { ok: P.green, no: P.red, wait: P.amber, dim: P.ink4, ink: P.ink2 }[l[2]], last = k === lines.length - 1; text('▸', 72, y, { font: MONO(400, 13), color: last ? col : P.ink4, alpha: a }); text(l[1], 92, y, { font: MONO(last ? 500 : 400, 13), color: last ? col : P.ink4, alpha: a }); });
+  // the counter plate
+  const pa = out(win(t, T.plate, T.plate + .5)) * (1 - win(t, T.brand, T.brand + .4));
+  if (pa > 0) { x.save(); x.globalAlpha = pa; x.shadowColor = 'rgba(0,0,0,.7)'; x.shadowBlur = 24; x.fillStyle = P.steel; rr(1560, 930, 288, 92, 7); x.fill(); x.shadowBlur = 0; x.strokeStyle = P.ghi; x.lineWidth = 1.5; rr(1560.5, 930.5, 287, 91, 7); x.stroke();
+    text('RUNS TODAY', 1584, 954, { font: MONO(400, 11), color: P.ink3, track: 1.5 });
+    const p = io(win(t, ...T.roll)), a = '1,283', b = '1,284'; x.save(); x.beginPath(); x.rect(1570, 968, 200, 44); x.clip(); text(a, 1584, 990 - p * 44, { font: MONO(600, 40), color: P.bluehi }); text(b, 1584, 1034 - p * 44, { font: MONO(600, 40), color: P.bluehi }); x.restore();
+    x.shadowColor = P.green; x.shadowBlur = 12; x.fillStyle = P.green; x.beginPath(); x.arc(1826, 954, 4, 0, 7); x.fill(); x.restore(); }
+  // the brand
+  const ba = out(win(t, T.brand, T.brand + .8));
+  if (ba > 0) { x.save(); x.globalAlpha = ba; x.translate(960, 500); const s = lerp(1.06, 1, ba); x.scale(s, s); text('machine', 0, 0, { font: SANS(600, 168), color: P.ink, align: 'center', track: -7 }); x.restore();
+    text('Build the line. Let them run it.', 960, 612, { font: SANS(500, 34), color: P.ink2, align: 'center', alpha: out(win(t, T.tag, T.tag + .6)), track: -.5 });
+    text('STATE MACHINES FOR AGENTS  ·  LOCALHOST:7420', 960, 676, { font: MONO(400, 13), color: P.bluehi, align: 'center', alpha: win(t, T.url, T.url + .5), track: 3 }); }
+}
+
+// ---------- grain & vignette ----------
+const grain = document.createElement('canvas'); grain.width = grain.height = 256; { const g = grain.getContext('2d'), im = g.createImageData(256, 256); for (let i = 0; i < im.data.length; i += 4) { const v = 128 + (Math.random() - .5) * 90; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } g.putImageData(im, 0, 0); }
+function post(t, f) {
+  const vg = x.createRadialGradient(960, 560, 420, 960, 560, 1320); vg.addColorStop(0, 'rgba(10,10,12,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)'); x.fillStyle = vg; x.fillRect(0, 0, 1920, 1080);
+  x.save(); x.globalAlpha = .045; x.globalCompositeOperation = 'overlay'; x.translate(-(f * 37) % 256, -(f * 91) % 256); x.fillStyle = x.createPattern(grain, 'repeat'); x.fillRect(0, 0, 1920 + 256, 1080 + 256); x.restore();
+}
+
+// ---------- the frame ----------
+function draw(t) {
+  const f = Math.round(t * FPS), m = morph(t), C = cam(t);
+  x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.fillStyle = P.page; x.fillRect(0, 0, 1920, 1080);
+  // the world
+  x.save(); x.translate(960, 540); x.scale(C.z, C.z); x.translate(-C.cx, -C.cy);
+  const ba0 = win(t, T.brand, T.brand + .8), dim = 1 - .78 * ba0; if (ba0 > 0) x.filter = `blur(${(ba0 * 6).toFixed(1)}px)`;
+  x.globalAlpha = dim;
+  floor(m, t);
+  x.globalAlpha = dim; otherLines(t);
+  x.globalAlpha = dim; work(t);
+  x.globalAlpha = dim; edges(m, t);
+  const pp = partPos(t); if (pp) { x.globalAlpha = dim; item(pp[0], pp[1]); }
+  x.globalAlpha = dim; ST.forEach(s => station(s, m, t));
+  x.globalAlpha = dim; gates(m, t);
+  x.globalAlpha = dim; callouts(m, t);
+  x.restore(); x.filter = 'none';
+  x.globalAlpha = 1; hud(t); post(t, f);
+  // fade in / out
+  const fo = win(t, ...T.fade), fi = 1 - win(t, 0, .4); if (fo > 0 || fi > 0) { x.fillStyle = `rgba(0,0,0,${Math.max(fo, fi)})`; x.fillRect(0, 0, 1920, 1080); }
+}
+const ready = Promise.all([SANS(600, 40), SANS(500, 22), MONO(400, 12), MONO(500, 12), MONO(600, 40)].map(f => document.fonts.load(f)));
+window.__film = { duration: DURATION, fps: FPS, ready, seek: t => { draw(Math.max(0, Math.min(DURATION, t))); return true; } };
+ready.then(() => { const t0 = +(new URLSearchParams(location.search).get('t') || 0); draw(t0); if (new URLSearchParams(location.search).has('play')) { const start = performance.now(); const loop = () => { draw(((performance.now() - start) / 1000 + t0) % DURATION); requestAnimationFrame(loop); }; loop(); } });
+</script></body></html>

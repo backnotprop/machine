@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>machine: identity sheet</title>
+<style>
+:root {
+  --bg: #0a0a0a; --surface: #0f0f0f; --raised: #161616; --border: #262626; --border-strong: #333333;
+  --text: #ededed; --text-2: #a1a1a1; --text-3: #666666; --accent: #3b82f6;
+  --sans: "Geist Sans", Inter, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+main { max-width: 1240px; margin: 0 auto; padding: 48px 32px 64px; }
+h1, h2, h3, p { margin: 0; }
+code, .id, .num, figcaption { font-family: var(--mono); }
+svg.g { display: block; fill: currentColor; flex: none; }
+.mono { --acc: currentColor; }
+
+.top { display: flex; align-items: flex-start; gap: 16px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
+.top h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+.top p { color: var(--text-2); max-width: 760px; }
+.top p.how { color: var(--text-3); font-size: 13px; margin-top: 4px; }
+.top .meta { margin-left: auto; font: 12px var(--mono); color: var(--text-3); white-space: nowrap; }
+
+.dir { padding: 40px 0 8px; }
+.dhead { display: grid; grid-template-columns: 40px 220px 1fr; gap: 0 16px; align-items: baseline; margin-bottom: 16px; }
+.dhead .num { color: var(--text-3); font-size: 12px; }
+.dhead h2 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.dhead p { color: var(--text-2); max-width: 680px; }
+
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; display: flex; flex-direction: column; }
+.card header { display: flex; align-items: baseline; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.card header .id { font-size: 12px; color: var(--text-3); }
+.card header h3 { font-size: 13px; font-weight: 500; }
+.stage { display: flex; align-items: center; gap: 24px; padding: 20px 16px; border-bottom: 1px solid var(--border); }
+.big { width: 64px; height: 64px; }
+.sizes { display: flex; align-items: flex-end; gap: 14px; }
+.sizes figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.sizes figcaption { font-size: 10px; color: var(--text-3); line-height: 1; }
+.sizes figure.mono { color: var(--text-2); }
+.lock { display: flex; align-items: center; gap: 10px; height: 64px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+.lock.light { background: #ffffff; color: #0a0a0a; border-bottom: 0; }
+.lock .fav { margin-left: auto; }
+.wm { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+.wm.m { font-family: var(--mono); font-weight: 500; letter-spacing: -0.03em; }
+.ti { position: relative; display: inline-block; }
+.ti b { position: absolute; left: 50%; top: -0.06em; width: 0.26em; height: 0.26em; margin-left: -0.13em; border-radius: 50%; background: var(--acc, #3b82f6); }
+.note { flex: 1; padding: 12px 16px 14px; font-size: 12px; color: var(--text-2); }
+.note b { font-weight: 500; color: var(--text); }
+
+.short { margin-top: 48px; padding-top: 40px; border-top: 1px solid var(--border); }
+.short > h2 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.short > p { color: var(--text-2); margin-bottom: 20px; }
+.pick { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 16px; margin-bottom: 16px; }
+.pickhead { display: flex; align-items: baseline; gap: 10px; }
+.pickhead .id { font-size: 12px; color: var(--text-3); }
+.pickhead h3 { font-size: 14px; font-weight: 600; }
+.pickhead code { margin-left: auto; font-size: 12px; color: var(--text-3); }
+.pick > p { color: var(--text-2); margin: 4px 0 16px; max-width: 820px; }
+.situ { display: flex; gap: 16px; align-items: stretch; }
+.side { width: 220px; flex: none; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px 12px; }
+.side .brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px; font-weight: 600; letter-spacing: -0.01em; }
+.side .nav { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 6px; color: var(--text-2); font-size: 14px; }
+.side .nav.on { background: var(--raised); color: var(--text); }
+.side .count { font: 12px var(--mono); color: var(--text); background: var(--raised); border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; line-height: 18px; }
+.tabs-wrap { flex: 1; display: flex; flex-direction: column; gap: 12px; justify-content: center; min-width: 0; }
+.tabs { display: flex; gap: 2px; background: #161616; border: 1px solid var(--border); border-radius: 6px; padding: 6px 6px 0; color: var(--text); }
+.tab { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; width: 190px; font-size: 12px; color: var(--text-2); border-radius: 6px 6px 0 0; white-space: nowrap; overflow: hidden; }
+.tab.on { background: var(--bg); color: var(--text); }
+.tab .g { color: var(--text); }
+.tab i.other { width: 16px; height: 16px; border-radius: 4px; background: #404040; flex: none; }
+.tab i.other.r { border-radius: 50%; }
+.tabs.light { background: #e8e8e8; border-color: #d4d4d4; }
+.tabs.light .tab { color: #525252; }
+.tabs.light .tab.on { background: #ffffff; color: #0a0a0a; }
+.tabs.light .tab .g { color: #0a0a0a; }
+.tabs.light i.other { background: #b4b4b4; }
+footer { margin-top: 32px; font-size: 12px; color: var(--text-3); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<g id="s-1a"><rect x="12" y="4" width="40" height="16" rx="5"/><rect x="28" y="20" width="8" height="8"/><path d="M20 28H44L32 40Z"/><rect x="12" y="44" width="40" height="16" rx="5" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-1b"><rect x="4" y="4" width="56" height="56" rx="16" fill="none" stroke-width="8" style="stroke:var(--acc,#3b82f6)"/><rect x="16" y="16" width="32" height="32" rx="7"/></g>
+<g id="s-1c"><path d="M26 20L16 44M38 20L48 44" fill="none" stroke="currentColor" stroke-width="8"/><rect x="16" y="4" width="32" height="16" rx="5"/><rect x="4" y="44" width="20" height="16" rx="5"/><rect x="40" y="44" width="20" height="16" rx="5" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-1d"><rect x="8" y="20" width="16" height="24" rx="3" fill="none" stroke="currentColor" stroke-width="8"/><rect x="28" y="28" width="6" height="8"/><path d="M32 20V44L42 32Z"/><rect x="44" y="16" width="16" height="32" rx="4" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-2a"><path d="M12 60V22a10 10 0 0 1 20 0V60M32 22a10 10 0 0 1 20 0V40" fill="none" stroke="currentColor" stroke-width="8"/><rect x="44" y="44" width="16" height="16" rx="4" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-2b"><path d="M12 46V22a10 10 0 0 1 20 0V46M32 22a10 10 0 0 1 20 0V46" fill="none" stroke="currentColor" stroke-width="8"/><rect x="4" y="44" width="16" height="16" rx="4"/><rect x="24" y="44" width="16" height="16" rx="4"/><rect x="44" y="44" width="16" height="16" rx="4" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-2c"><path d="M4 60V20A12 12 0 0 1 16 8H24A12 12 0 0 1 36 20V60H24V20H16V60Z"/><path d="M44 8A12 12 0 0 1 56 20V60H44Z" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-2d"><path d="M12 60V22a10 10 0 0 1 20 0V60M32 22a10 10 0 0 1 20 0V44" fill="none" stroke="currentColor" stroke-width="8"/><path d="M42 44H62L52 58Z" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-3a"><rect x="8" y="4" width="8" height="56"/><rect x="48" y="4" width="8" height="56"/><rect x="16" y="12" width="32" height="8"/><rect x="16" y="28" width="32" height="8" style="fill:var(--acc,#3b82f6)"/><rect x="16" y="44" width="32" height="8"/></g>
+<g id="s-3b"><rect x="8" y="28" width="48" height="8"/><circle cx="10" cy="32" r="8"/><circle cx="32" cy="32" r="8"/><circle cx="54" cy="32" r="8" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-3c"><rect x="4" y="4" width="56" height="8" rx="2"/><rect x="4" y="52" width="56" height="8" rx="2"/><path d="M8 28H32V20L48 32L32 44V36H8Z" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-4a"><rect x="8" y="16" width="48" height="32" rx="16" fill="none" stroke="currentColor" stroke-width="8"/><circle cx="24" cy="32" r="8" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-4b"><path fill-rule="evenodd" d="M18 4H46A14 14 0 0 1 60 18V46A14 14 0 0 1 46 60H18A14 14 0 0 1 4 46V18A14 14 0 0 1 18 4ZM16 32A16 16 0 1 0 48 32A16 16 0 1 0 16 32Z"/><circle cx="32" cy="32" r="8" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-4c"><rect x="12" y="28" width="28" height="8"/><rect x="24" y="28" width="16" height="32"/><rect x="12" y="52" width="40" height="8"/><circle cx="32" cy="12" r="8" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-4d"><circle cx="16" cy="16" r="12" style="fill:var(--acc,#3b82f6)"/><circle cx="48" cy="16" r="12"/><circle cx="16" cy="48" r="12"/><circle cx="48" cy="48" r="12"/></g>
+<g id="s-5a"><rect x="8" y="4" width="8" height="56"/><rect x="8" y="4" width="16" height="8"/><rect x="8" y="52" width="16" height="8"/><rect x="48" y="4" width="8" height="56"/><rect x="40" y="4" width="16" height="8"/><rect x="40" y="52" width="16" height="8"/><circle cx="32" cy="32" r="8" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-5b"><rect x="4" y="28" width="22" height="8"/><path d="M22 18L38 32L22 46Z"/><rect x="44" y="20" width="16" height="24" rx="4" style="fill:var(--acc,#3b82f6)"/></g>
+<g id="s-5c"><path d="M4 52V16A8 8 0 0 1 12 8H36A8 8 0 0 1 44 16V52H36V16H28V52H20V16H12V52Z"/><rect x="48" y="52" width="12" height="8" style="fill:var(--acc,#3b82f6)"/></g>
+</defs></svg>
+<main>
+<div class="top">
+  <div>
+    <h1>machine &middot; identity sheet</h1>
+    <p>machine is a web UI where you draw a process as a state machine; publishing it gives an agent a skill and a definition that a tool enforces step by step.</p>
+    <p class="how">Each card shows one glyph at 64, 32 and 16 px, then in one colour (mono), then the lockup on dark and on white with a 16 px favicon. Blue is used on at most one part of each glyph.</p>
+  </div>
+  <span class="meta">5 directions &middot; 18 variations &middot; 2026-10-19</span>
+</div>
+<section class="dir">
+  <div class="dhead"><span class="num">01</span><h2>Node and edge</h2><p>The product already draws every process as rounded nodes joined by arrows, with the current node in blue. A mark taken from that graph is one people have seen before they notice it is the logo.</p></div>
+  <div class="cards">
+<article class="card">
+  <header><span class="id">1a</span><h3>Step</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg></span></div>
+  <p class="note"><b>Says</b> One state leads to the next, and the lower one is where the run is now. <b>Weak</b> At 16 px the arrowhead nearly touches the lower node and the whole thing can read as a funnel.</p>
+</article>
+<article class="card">
+  <header><span class="id">1b</span><h3>Current</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1b"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1b"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1b"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1b"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1b"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1b"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1b"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1b"/></svg></span></div>
+  <p class="note"><b>Says</b> The current node with a ring around it, as in the run graph. <b>Weak</b> Also reads as a stop button or a generic app tile.</p>
+</article>
+<article class="card">
+  <header><span class="id">1c</span><h3>Branch</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1c"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1c"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1c"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1c"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1c"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1c"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1c"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1c"/></svg></span></div>
+  <p class="note"><b>Says</b> A decision state with two outcomes, one of them taken. <b>Weak</b> Close to the usual sitemap and hierarchy icons.</p>
+</article>
+<article class="card">
+  <header><span class="id">1d</span><h3>Pair</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1d"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1d"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1d"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1d"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1d"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1d"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1d"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1d"/></svg></span></div>
+  <p class="note"><b>Says</b> From this state to that one, read left to right. <b>Weak</b> Too many parts for 16 px: the arrow and the hollow node close up.</p>
+</article>
+  </div></section>
+<section class="dir">
+  <div class="dhead"><span class="num">02</span><h2>The m as a graph</h2><p>An m is three stems joined by two arches, which is close to nodes joined by edges. These keep the letter readable and let one part stand for the current state.</p></div>
+  <div class="cards">
+<article class="card">
+  <header><span class="id">2a</span><h3>m, current node</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg></span></div>
+  <p class="note"><b>Says</b> The letter is the process; its last step is split off and lit as the current state. <b>Weak</b> The detached square can read as a full stop after the m.</p>
+</article>
+<article class="card">
+  <header><span class="id">2b</span><h3>m on nodes</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2b"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2b"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2b"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2b"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2b"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2b"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2b"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2b"/></svg></span></div>
+  <p class="note"><b>Says</b> The letter stands on three states, the last one current. <b>Weak</b> Heavy at 16 px; the 1 px gaps between the feet start to close.</p>
+</article>
+<article class="card">
+  <header><span class="id">2c</span><h3>Cut m</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2c"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2c"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2c"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2c"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2c"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2c"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2c"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2c"/></svg></span></div>
+  <p class="note"><b>Says</b> Two steps joined, the next one cut away and lit: a transition in a single letter. <b>Weak</b> Can read as an n followed by an l.</p>
+</article>
+<article class="card">
+  <header><span class="id">2d</span><h3>m with arrow</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2d"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2d"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2d"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2d"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2d"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2d"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2d"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2d"/></svg></span></div>
+  <p class="note"><b>Says</b> The process runs down and out into the next step. <b>Weak</b> The arrow pulls it toward a download icon, and at 16 px the arrowhead is a smudge.</p>
+</article>
+  </div></section>
+<section class="dir">
+  <div class="dhead"><span class="num">03</span><h2>On the rails</h2><p>The README says a tool keeps agents on the rails. These marks show a fixed track with steps or a direction held inside it.</p></div>
+  <div class="cards">
+<article class="card">
+  <header><span class="id">3a</span><h3>Ladder</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3a"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3a"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3a"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3a"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3a"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3a"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3a"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3a"/></svg></span></div>
+  <p class="note"><b>Says</b> Two rails that do not move, with steps between them and one active. <b>Weak</b> Reads as a ladder, which suggests climbing rather than following.</p>
+</article>
+<article class="card">
+  <header><span class="id">3b</span><h3>Stepper</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3b"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3b"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3b"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3b"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3b"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3b"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3b"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3b"/></svg></span></div>
+  <p class="note"><b>Says</b> Steps in order, the last one live. <b>Weak</b> Every progress stepper looks like this, and the dots fall off the pixel grid, so it goes soft at 16 px.</p>
+</article>
+<article class="card">
+  <header><span class="id">3c</span><h3>Guard rails</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3c"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3c"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3c"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3c"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3c"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3c"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3c"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-3c"/></svg></span></div>
+  <p class="note"><b>Says</b> The agent moves forward between two rails it cannot leave. <b>Weak</b> Small, it looks like a media control or a text-wrap icon.</p>
+</article>
+  </div></section>
+<section class="dir">
+  <div class="dhead"><span class="num">04</span><h2>Status dot</h2><p>Every run is shown as a dot and a word, and the blue dot means running. These marks put that dot inside a shape so the logo carries the same signal as the interface.</p></div>
+  <div class="cards">
+<article class="card">
+  <header><span class="id">4a</span><h3>Pill</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4a"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4a"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4a"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4a"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4a"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4a"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4a"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4a"/></svg></span></div>
+  <p class="note"><b>Says</b> The status pill, the element repeated most in the UI. <b>Weak</b> Reads as a toggle switch.</p>
+</article>
+<article class="card">
+  <header><span class="id">4b</span><h3>Lit node</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg></span></div>
+  <p class="note"><b>Says</b> The current sidebar square with a status dot cut into it, so the brand row barely changes. <b>Weak</b> A dot in a square is not distinctive alone; in one colour it relies on the cut ring.</p>
+</article>
+<article class="card">
+  <header><span class="id">4c</span><h3>Tittle</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4c"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4c"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4c"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4c"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4c"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><span class="wm">mach<span class="ti">&#305;<b></b></span>ne</span></div>
+  <div class="lock light"><span class="wm">mach<span class="ti">&#305;<b></b></span>ne</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4c"/></svg></span></div>
+  <p class="note"><b>Says</b> The dot on the i is the running dot; the wordmark carries the signal with no glyph. <b>Weak</b> The glyph alone reads as an information icon.</p>
+</article>
+<article class="card">
+  <header><span class="id">4d</span><h3>Four states</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4d"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4d"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4d"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4d"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4d"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4d"/></svg><span class="wm">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4d"/></svg><span class="wm">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4d"/></svg></span></div>
+  <p class="note"><b>Says</b> Running, waiting, blocked, succeeded, with one lit. <b>Weak</b> A 2&times;2 grid reads as an app launcher.</p>
+</article>
+  </div></section>
+<section class="dir">
+  <div class="dhead"><span class="num">05</span><h2>Mono token</h2><p>Everything the agent or the tool produces is set in Geist Mono, and ids are snake_case. These marks borrow one typed token and pair with a mono wordmark.</p></div>
+  <div class="cards">
+<article class="card">
+  <header><span class="id">5a</span><h3>Bracketed state</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5a"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5a"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5a"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5a"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5a"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5a"/></svg><span class="wm m">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5a"/></svg><span class="wm m">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5a"/></svg></span></div>
+  <p class="note"><b>Says</b> A state, held in brackets the way a schema would hold it. <b>Weak</b> Brackets are common across developer tools.</p>
+</article>
+<article class="card">
+  <header><span class="id">5b</span><h3>Event into state</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5b"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5b"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5b"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5b"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5b"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5b"/></svg><span class="wm m">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5b"/></svg><span class="wm m">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5b"/></svg></span></div>
+  <p class="note"><b>Says</b> An event arriving at a state, as in drafted &rarr; self_review. <b>Weak</b> Most of the mark is a plain arrow; in one colour it is an arrow and a box.</p>
+</article>
+<article class="card">
+  <header><span class="id">5c</span><h3>m_</h3></header>
+  <div class="stage">
+    <div class="big"><svg class="g" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5c"/></svg></div>
+    <div class="sizes">
+      <figure><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5c"/></svg><figcaption>32</figcaption></figure>
+      <figure><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5c"/></svg><figcaption>16</figcaption></figure>
+      <figure class="mono"><svg class="g" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5c"/></svg><figcaption>mono</figcaption></figure>
+      <figure class="mono"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5c"/></svg><figcaption>16</figcaption></figure>
+    </div>
+  </div>
+  <div class="lock"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5c"/></svg><span class="wm m">machine</span></div>
+  <div class="lock light"><svg class="g" width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5c"/></svg><span class="wm m">machine</span><span class="fav"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-5c"/></svg></span></div>
+  <p class="note"><b>Says</b> A snake_case id with the cursor where the next part goes. <b>Weak</b> Close to terminal and CLI icons.</p>
+</article>
+  </div></section>
+<section class="short">
+  <h2>Shortlist</h2>
+  <p>Three picks, each shown as the 220 px sidebar brand row and as a favicon in a tab strip on dark and light.</p>
+<div class="pick">
+  <div class="pickhead"><span class="id">4b</span><h3>Lit node</h3><code>docs/brand/lit-node.svg</code></div>
+  <p>It is the square the app already uses, with the running dot cut into it: the smallest change to the product, the strongest favicon of the set, and it still works in one colour because the dot sits in its own ring.</p>
+  <div class="situ">
+    <div class="side">
+      <div class="brand"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg><span>machine</span></div>
+      <div class="nav on"><span>Runs</span><span class="count">1</span></div>
+      <div class="nav"><span>Machines</span></div>
+    </div>
+    <div class="tabs-wrap">
+      <div class="tabs">
+        <div class="tab"><i class="other"></i><span>Pull requests</span></div>
+        <div class="tab on"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg><span>Runs &middot; machine</span></div>
+        <div class="tab"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg><span>changelog-draft</span></div>
+        <div class="tab"><i class="other r"></i><span>Docs</span></div>
+      </div>
+      <div class="tabs light">
+        <div class="tab"><i class="other"></i><span>Pull requests</span></div>
+        <div class="tab on"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg><span>Runs &middot; machine</span></div>
+        <div class="tab"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-4b"/></svg><span>changelog-draft</span></div>
+        <div class="tab"><i class="other r"></i><span>Docs</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="pick">
+  <div class="pickhead"><span class="id">2a</span><h3>m, current node</h3><code>docs/brand/m-node.svg</code></div>
+  <p>The only pick that reads as the name; it is an m drawn with the same stroke as the graph edges, and its last step being separate and lit says where the run is.</p>
+  <div class="situ">
+    <div class="side">
+      <div class="brand"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg><span>machine</span></div>
+      <div class="nav on"><span>Runs</span><span class="count">1</span></div>
+      <div class="nav"><span>Machines</span></div>
+    </div>
+    <div class="tabs-wrap">
+      <div class="tabs">
+        <div class="tab"><i class="other"></i><span>Pull requests</span></div>
+        <div class="tab on"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg><span>Runs &middot; machine</span></div>
+        <div class="tab"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg><span>changelog-draft</span></div>
+        <div class="tab"><i class="other r"></i><span>Docs</span></div>
+      </div>
+      <div class="tabs light">
+        <div class="tab"><i class="other"></i><span>Pull requests</span></div>
+        <div class="tab on"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg><span>Runs &middot; machine</span></div>
+        <div class="tab"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-2a"/></svg><span>changelog-draft</span></div>
+        <div class="tab"><i class="other r"></i><span>Docs</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="pick">
+  <div class="pickhead"><span class="id">1a</span><h3>Step</h3><code>docs/brand/step.svg</code></div>
+  <p>It is the run graph reduced to two nodes and one edge, so it explains the product without a word, and it holds up at 16 px.</p>
+  <div class="situ">
+    <div class="side">
+      <div class="brand"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg><span>machine</span></div>
+      <div class="nav on"><span>Runs</span><span class="count">1</span></div>
+      <div class="nav"><span>Machines</span></div>
+    </div>
+    <div class="tabs-wrap">
+      <div class="tabs">
+        <div class="tab"><i class="other"></i><span>Pull requests</span></div>
+        <div class="tab on"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg><span>Runs &middot; machine</span></div>
+        <div class="tab"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg><span>changelog-draft</span></div>
+        <div class="tab"><i class="other r"></i><span>Docs</span></div>
+      </div>
+      <div class="tabs light">
+        <div class="tab"><i class="other"></i><span>Pull requests</span></div>
+        <div class="tab on"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg><span>Runs &middot; machine</span></div>
+        <div class="tab"><svg class="g" width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><use href="#s-1a"/></svg><span>changelog-draft</span></div>
+        <div class="tab"><i class="other r"></i><span>Docs</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+<footer>Glyphs are drawn on a 64-unit grid with 8-unit strokes, so they land on whole pixels at 16, 32 and 64 px. Regenerate with <code>docs/brand/build.sh</code>.</footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "code-review-happy",
+  "machine": "examples/code-review-loop.machine.json",
+  "inputs": { "repo_path": "$FIXTURE", "task": "Add clamp(n, lo, hi) to src/math.ts: returns n limited to the inclusive range [lo, hi]; throws a RangeError when lo > hi. Export it from src/index.ts and cover it with tests, including the lo > hi case." },
+  "setup": "bash $ROOT/evals/fixtures/code-review.sh",
+  "env": { "PATH": "$FIXTURE/bin:$PATH" },
+  "max_turns": 80,
+  "prompt_suffix": "Everything for this run lives inside the fixture: its stub `gh` is first on PATH and it is its own origin. Committing, branching, pushing to that origin and merging through `gh` are expected here. For the second review, run `claude -p` from Bash with the diff. Never touch any real GitHub repository.",
+  "expect": { "status": "succeeded", "state": "shipped", "max_rejected": 0 },
+  "judge": {
+    "question": "All must hold: (1) src/math.ts exports clamp(n, lo, hi) that returns n limited to [lo, hi] and throws a RangeError when lo > hi; (2) src/index.ts re-exports clamp; (3) src/math.test.ts (or another test file shown) covers clamp including the lo > hi throw; (4) the git log shows the work landed on main through a merge of a feature branch (a 'Merge pull request' commit), not by committing straight to main.",
+    "files": ["src/math.ts", "src/index.ts", "src/math.test.ts"]
+  }
+}

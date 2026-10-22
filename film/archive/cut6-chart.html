@@ -1,0 +1,380 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="frames/fonts.css">
+<style>html,body{margin:0;background:#000}canvas{display:block;width:1920px;height:1080px}</style></head><body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script src="icons.js"></script>
+<script>
+// machine · launch film, cut 6. One canvas, 1920×1080, 60 fps, 47 s. window.__film = { duration, fps, ready, seek(t) }.
+// A real statechart is drawn on an engineering sheet, published into a skill, loaded by five agents whose marks then
+// move through the chart as runs: allowed, rejected, waiting on a person, approved, shipped. Then the ledger of runs.
+const DURATION = 47, FPS = 60;
+const c = document.getElementById('c'), x = c.getContext('2d');
+const P = { page: '#0a0a0c', sheet: '#0c0c10', ink: '#ededef', ink2: '#a3a3ad', ink3: '#85858f', ink4: '#4a4a53', g: '#3a3a42', glo: '#26262d', blue: '#3b82f6', bluehi: '#93c2ff', red: '#ff5d62', amber: '#f2b45a', green: '#6ee7a0', node: '#121217', node2: '#17171d' };
+const SANS = (w, s) => `${w} ${s}px "Geist Sans"`, MONO = (w, s) => `${w} ${s}px "Geist Mono"`;
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v)), lerp = (a, b, p) => a + (b - a) * p;
+const win = (t, a, b) => clamp((t - a) / (b - a));
+const io = p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+const out = p => 1 - Math.pow(1 - p, 3), back = p => { const s = 1.70158; return 1 + (s + 1) * Math.pow(p - 1, 3) + s * Math.pow(p - 1, 2); };
+const hash = (i, j, k = 0) => { let h = (i * 374761393 + j * 668265263 + k * 1274126177) | 0; h = Math.imul(h ^ (h >>> 13), 1103515245); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+const rr = (px, py, w, h, r) => { x.beginPath(); x.roundRect(px, py, w, h, r); };
+const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+const text = (s, px, py, { font = MONO(400, 12), color = P.ink3, align = 'left', base = 'middle', alpha = 1, track = 0 } = {}) => { if (alpha <= 0) return; x.save(); x.globalAlpha *= alpha; x.font = font; x.fillStyle = color; x.textAlign = align; x.textBaseline = base; x.letterSpacing = track + 'px'; x.fillText(s, px, py); x.restore(); };
+const tw = (s, font) => { x.font = font; return x.measureText(s).width; };
+
+// ---- agent marks: monochrome SVGs tinted per use -------------------------------------------------------------------
+const icons = {}, iconPromises = [];
+function icon(name, color) { const k = name + color; if (icons[k]) return icons[k]; const im = new Image(); im.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(ICONS[name].replace(/currentColor/g, color)); icons[k] = im; iconPromises.push(new Promise(r => { im.onload = r; im.onerror = r; })); return im; }
+function mark(name, color, px, py, s, a = 1) { if (a <= 0) return; const im = icon(name, color); if (!im.complete || !im.naturalWidth) return; const r = im.naturalWidth / im.naturalHeight, w = r >= 1 ? s : s * r, h = r >= 1 ? s / r : s; x.save(); x.globalAlpha *= a; x.drawImage(im, px - w / 2, py - h / 2, w, h); x.restore(); }
+const AGENTS = [
+  { id: 'claude', name: 'claude code', col: '#e8956a' },
+  { id: 'codex', name: 'codex', col: '#ededef' },
+  { id: 'gemini', name: 'gemini', col: '#7fb2ff' },
+  { id: 'opencode', name: 'opencode', col: '#c9c9d1' },
+  { id: 'cursor', name: 'cursor', col: '#b7b7c6' },
+];
+
+// ---- the statechart ------------------------------------------------------------------------------------------------
+const Y = 470, NW = 140, NH = 56;
+const N = {
+  init: { x: 150, y: Y, kind: 'init' },
+  plan: { x: 290, y: Y, w: NW, h: NH, label: 'plan' },
+  build: { x: 520, y: Y, w: NW, h: NH, label: 'build' },
+  verify: { x: 830, y: Y, w: 290, h: 150, label: 'verify', kind: 'parallel', lanes: ['lint', 'types', 'tests'] },
+  review: { x: 1120, y: Y, w: NW, h: NH, label: 'review', kind: 'wait' },
+  stage: { x: 1345, y: Y, w: NW, h: NH, label: 'stage' },
+  canary: { x: 1560, y: Y, w: NW, h: NH, label: 'canary', kind: 'decision' },
+  ship: { x: 1800, y: Y, w: 110, h: NH, label: 'ship', kind: 'final' },
+  blocked: { x: 830, y: 740, w: 170, h: NH, label: 'blocked', kind: 'final', bad: true },
+  rollback: { x: 1560, y: 740, w: NW, h: NH, label: 'rollback' },
+};
+for (const k in N) N[k].id = k;
+const L = id => N[id].x - N[id].w / 2, R = id => N[id].x + N[id].w / 2, Tp = id => N[id].y - N[id].h / 2, B = id => N[id].y + N[id].h / 2;
+// edges as orthogonal polylines, label sits on the segment named by `lab` (index) with an offset
+const E = [
+  { id: 'start', pts: [[N.init.x + 9, Y], [L('plan'), Y]] },
+  { id: 'planned', pts: [[R('plan'), Y], [L('build'), Y]], label: 'planned' },
+  { id: 'built', pts: [[R('build'), Y], [L('verify'), Y]], label: 'built' },
+  { id: 'pass', pts: [[R('verify'), Y], [L('review'), Y]], label: 'all pass' },
+  { id: 'approved', pts: [[R('review'), Y], [L('stage'), Y]], label: 'approved', guard: 'human', human: true },
+  { id: 'deployed', pts: [[R('stage'), Y], [L('canary'), Y]], label: 'deployed' },
+  { id: 'healthy', pts: [[R('canary'), Y], [L('ship'), Y]], label: 'healthy', guard: 'errors<1%' },
+  { id: 'fail', pts: [[N.verify.x - 60, B('verify')], [N.verify.x - 60, 610], [N.build.x + 30, 610], [N.build.x + 30, B('build')]], label: 'fail', guard: 'retries < 3', lab: 1, dy: 16 },
+  { id: 'exhausted', pts: [[N.verify.x + 60, B('verify')], [N.verify.x + 60, Tp('blocked')]], label: 'fail', guard: 'retries ≥ 3', lab: 0, side: 1, bad: true },
+  { id: 'changes', pts: [[N.review.x, Tp('review')], [N.review.x, 330], [N.build.x - 30, 330], [N.build.x - 30, Tp('build')]], label: 'changes', guard: 'human', human: true, lab: 1, dy: -14 },
+  { id: 'unhealthy', pts: [[N.canary.x, B('canary')], [N.canary.x, Tp('rollback')]], label: 'unhealthy', lab: 0, side: 1 },
+  { id: 'rolled', pts: [[L('rollback'), N.rollback.y], [N.build.x, N.rollback.y], [N.build.x, B('build')]], label: 'rolled back', lab: 0, dy: 16 },
+];
+const EI = Object.fromEntries(E.map(e => [e.id, e]));
+const elen = e => { let s = 0; for (let i = 1; i < e.pts.length; i++) s += Math.hypot(e.pts[i][0] - e.pts[i - 1][0], e.pts[i][1] - e.pts[i - 1][1]); return s; };
+const along = (e, p) => { let d = clamp(p) * elen(e); for (let i = 1; i < e.pts.length; i++) { const a = e.pts[i - 1], b = e.pts[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (d <= l || i === e.pts.length - 1) { const q = l ? d / l : 1; return [lerp(a[0], b[0], q), lerp(a[1], b[1], q)]; } d -= l; } return e.pts[e.pts.length - 1]; };
+// draw order while the chart is being designed
+const BUILD = ['init', 'plan', 'start', 'build', 'planned', 'verify', 'built', 'review', 'pass', 'stage', 'approved', 'canary', 'deployed', 'ship', 'healthy', 'fail', 'blocked', 'exhausted', 'changes', 'rollback', 'unhealthy', 'rolled'];
+const T0 = 4.7, STEP = 0.33;
+const tIn = k => { const i = BUILD.indexOf(k); return i < 0 ? 0 : T0 + i * STEP; };
+
+// ---- timeline ------------------------------------------------------------------------------------------------------
+const T = {
+  sheet: [0.3, 1.6], title: 0.8,
+  gates: 9.0,                         // "every state, every transition, every gate": the gates light up
+  publish: 13.4, sweep: [13.5, 14.4], stamp: 14.5, card: 14.9,
+  agents: 16.9, fly: [17.4, 18.4],
+  wide: 36.9, ledger: [37.4, 38.4], brand: 40.6, tag: 42.4, url: 44.0, fade: [46.0, 47],
+};
+// each agent's run: segments of [t, where] — where is a node id (sitting) or 'edge:id' (moving, takes MOVE s)
+const MOVE = 0.7;
+const RUNS = {
+  claude:   [[17.4, 'plan'], [18.3, 'edge:planned'], [19.0, 'build'], [24.6, 'edge:built'], [25.3, 'verify'], [29.0, 'edge:pass'], [29.7, 'review'], [32.8, 'edge:approved'], [33.5, 'stage'], [34.3, 'edge:deployed'], [35.0, 'canary'], [35.6, 'edge:healthy'], [36.3, 'ship']],
+  codex:    [[18.0, 'plan'], [19.2, 'edge:planned'], [19.9, 'build'], [30.2, 'edge:built'], [30.9, 'verify'], [34.0, 'edge:fail'], [34.7, 'build']],
+  gemini:   [[18.5, 'plan'], [20.0, 'edge:planned'], [20.7, 'build'], [22.4, 'edge:built'], [23.1, 'verify'], [26.2, 'edge:fail'], [26.9, 'build'], [33.2, 'edge:built'], [33.9, 'verify']],
+  opencode: [[19.0, 'plan'], [20.8, 'edge:planned'], [21.5, 'build'], [27.6, 'edge:built'], [28.3, 'verify'], [31.6, 'edge:pass'], [32.3, 'review']],
+  cursor:   [[19.6, 'plan'], [21.6, 'edge:planned'], [22.3, 'build'], [33.6, 'edge:built'], [34.3, 'verify']],
+};
+const REJECT = { who: 'codex', t: 27.2, at: 'build', tried: 'ship' };    // off the map
+const WAIT = { who: 'claude', from: 29.7, until: 32.8 };                  // the human gate
+const APPROVE = 32.4;
+const CAPTIONS = [[0.8, 'State machines for agents.'], [4.6, 'You design the workflow.'], [9.0, 'Every state, every transition, every gate.'], [13.4, 'Publish it. It becomes a skill.'], [16.9, 'Agents load the skill. Every move reports back over MCP.'], [21.5, 'The machine decides what\'s allowed next.'], [24.2, 'The agent decides how.'], [27.0, 'Off the map? Rejected.'], [30.9, 'A human gate? It waits.'], [33.2, 'Determinism where you need it. Emergence where agents shine.'], [36.9, 'Organize your machines. Account for every run.'], [40.5, '']];
+const CONSOLE = [
+  [17.5, 'claude', 'begin()  →  run_8f2k · plan', 'ink'],
+  [18.1, 'codex', 'begin()  →  run_9a1c · plan', 'ink'],
+  [18.4, 'claude', 'transition("planned")  ✓ ok  ·  build', 'ok'],
+  [19.3, 'codex', 'transition("planned")  ✓ ok  ·  build', 'ok'],
+  [21.6, 'claude', 'allowed next: built', 'dim'],
+  [24.7, 'claude', 'transition("built")  ✓ ok  ·  verify', 'ok'],
+  [26.3, 'gemini', 'transition("fail")  ✓ ok  ·  build  [retries 1/3]', 'ok'],
+  [27.3, 'codex', 'transition("ship")  ✗ rejected  ·  "ship" is not an event of build', 'no'],
+  [29.1, 'claude', 'transition("all pass")  ✓ ok  ·  review', 'ok'],
+  [29.9, 'claude', 'review  ◌ waiting  ·  a person decides', 'wait'],
+  [32.5, 'you', 'approved  ·  run_8f2k', 'ok'],
+  [34.4, 'claude', 'transition("deployed")  ✓ ok  ·  canary', 'ok'],
+  [36.4, 'claude', 'run_8f2k  ·  ship  ◉  done', 'ok'],
+];
+const CAM = [[0, 960, 500, 1.02], [20.6, 960, 500, 1.02], [22.0, 640, 520, 1.5], [26.3, 640, 520, 1.5], [27.0, 700, 520, 1.5], [29.6, 700, 520, 1.5], [30.6, 1080, 520, 1.5], [32.9, 1080, 520, 1.5], [34.0, 960, 530, 1.02], [36.9, 960, 530, 1.02], [38.4, 960, 540, .94], [47, 960, 540, .94]];
+function cam(t) { let k = 0; while (k < CAM.length - 2 && t >= CAM[k + 1][0]) k++; const a = CAM[k], b = CAM[k + 1], p = io(win(t, a[0], b[0])); return { cx: lerp(a[1], b[1], p), cy: lerp(a[2], b[2], p), z: lerp(a[3], b[3], p) }; }
+
+// ---- where is each agent at time t --------------------------------------------------------------------------------
+function whereIs(id, t) {
+  const r = RUNS[id]; if (t < r[0][0]) return null;
+  let k = 0; while (k < r.length - 1 && t >= r[k + 1][0]) k++;
+  const [ts, w] = r[k];
+  if (w.startsWith('edge:')) { const e = EI[w.slice(5)], p = io(win(t, ts, ts + MOVE)); const [px, py] = along(e, p); return { x: px, y: py, moving: true, node: null, edge: e }; }
+  const n = N[w]; return { x: n.x, y: n.y, moving: false, node: n, since: ts };
+}
+// agents sitting in the same node fan out so the marks never stack
+function tokenPos(id, t) {
+  const w = whereIs(id, t); if (!w) return null;
+  // sitting: the chips dock in a row just above the state so its name stays readable
+  if (!w.moving) { const here = AGENTS.filter(a => { const q = whereIs(a.id, t); return q && !q.moving && q.node === w.node; }); const i = here.findIndex(a => a.id === id), n = here.length; return { ...w, x: w.node.x + (i - (n - 1) / 2) * 36, y: w.node.y - w.node.h / 2 - 22 }; }
+  return w;
+}
+
+// ---- sheet ----------------------------------------------------------------------------------------------------------
+function sheet(t) {
+  const a = out(win(t, ...T.sheet));
+  x.fillStyle = P.page; x.fillRect(-2000, -2000, 6000, 6000);
+  x.save(); x.globalAlpha = a;
+  // fine dot grid + major lines: an engineering sheet
+  x.fillStyle = '#ffffff';
+  for (let gx = 0; gx <= 1920; gx += 24) for (let gy = 0; gy <= 1080; gy += 24) { x.globalAlpha = a * ((gx % 120 === 0 && gy % 120 === 0) ? .16 : .055); x.fillRect(gx - .5, gy - .5, 1, 1); }
+  x.globalAlpha = a * .05; x.strokeStyle = '#fff'; x.lineWidth = 1;
+  for (let gx = 0; gx <= 1920; gx += 240) { x.beginPath(); x.moveTo(gx + .5, 0); x.lineTo(gx + .5, 1080); x.stroke(); }
+  for (let gy = 0; gy <= 1080; gy += 240) { x.beginPath(); x.moveTo(0, gy + .5); x.lineTo(1920, gy + .5); x.stroke(); }
+  x.restore();
+}
+
+// ---- drawing the chart ----------------------------------------------------------------------------------------------
+function arrow(px, py, ang, col, s = 9) { x.save(); x.translate(px, py); x.rotate(ang); x.fillStyle = col; x.beginPath(); x.moveTo(0, 0); x.lineTo(-s, -s * .5); x.lineTo(-s * .72, 0); x.lineTo(-s, s * .5); x.closePath(); x.fill(); x.restore(); }
+function edge(e, t, hot) {
+  const d = out(win(t, tIn(e.id), tIn(e.id) + STEP * 1.6)); if (d <= 0) return;
+  const col = e.bad ? P.red : e.human ? P.amber : hot ? P.bluehi : P.ink4, lab = e.bad ? P.red : e.human ? P.amber : hot ? P.bluehi : P.ink3;
+  x.save(); x.strokeStyle = col; x.lineWidth = hot ? 2 : 1.6; x.lineJoin = 'round'; x.setLineDash(e.human ? [7, 6] : []);
+  const total = elen(e); let left = d * total; x.beginPath(); x.moveTo(...e.pts[0]);
+  for (let i = 1; i < e.pts.length && left > 0; i++) { const a = e.pts[i - 1], b = e.pts[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]); const q = Math.min(1, left / l); x.lineTo(lerp(a[0], b[0], q), lerp(a[1], b[1], q)); left -= l; }
+  x.stroke(); x.setLineDash([]);
+  const [hx, hy] = along(e, d), [qx, qy] = along(e, Math.max(0, d - .02)); arrow(hx, hy, Math.atan2(hy - qy, hx - qx), col);
+  x.restore();
+  if (!e.label || d < .55) return;
+  const la = win(d, .55, 1), i = e.lab ?? 0, a = e.pts[i], b = e.pts[i + 1], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, vert = a[0] === b[0];
+  const guard = e.guard ? (e.human ? '· human' : `[${e.guard}]`) : '', gcol = e.human ? P.amber : P.ink4;
+  if (vert) { const sx = mx + 12 * (e.side || 1); text(e.label, sx, my - (guard ? 8 : 0), { font: MONO(500, 13), color: lab, alpha: la }); if (guard) text(guard, sx, my + 9, { font: MONO(400, 11.5), color: gcol, alpha: la }); }
+  else if (e.dy) { const up = e.dy < 0 && guard; text(e.label, mx, my + e.dy - (up ? 15 : 0), { font: MONO(500, 13), color: lab, align: 'center', alpha: la }); if (guard) text(guard, mx, my + e.dy + (up ? 0 : 16), { font: MONO(400, 11.5), color: gcol, align: 'center', alpha: la }); }
+  else { text(e.label, mx, my - 13, { font: MONO(500, 13), color: lab, align: 'center', alpha: la }); if (guard) text(guard, mx, my + 14, { font: MONO(400, 11.5), color: gcol, align: 'center', alpha: la }); }   // event above the line, guard below it
+}
+function node(n, t, state) {
+  const p = win(t, tIn(n.id), tIn(n.id) + STEP * 1.3); if (p <= 0) return;
+  const s = back(p), a = out(p);
+  x.save(); x.globalAlpha *= a; x.translate(n.x, n.y); x.scale(s, s); x.translate(-n.x, -n.y);
+  if (n.kind === 'init') { x.fillStyle = P.ink; x.beginPath(); x.arc(n.x, n.y, 8, 0, 7); x.fill(); x.restore(); return; }
+  const l = n.x - n.w / 2, tp = n.y - n.h / 2, hot = state?.hot, col = state?.col;
+  // glow when a run is here
+  if (hot) { const g = x.createRadialGradient(n.x, n.y, 10, n.x, n.y, n.w * .9); g.addColorStop(0, rgba(col, .22 * hot)); g.addColorStop(1, rgba(col, 0)); x.fillStyle = g; x.fillRect(l - 120, tp - 100, n.w + 240, n.h + 200); }
+  x.fillStyle = n.kind === 'parallel' ? P.node : P.node2; x.strokeStyle = state?.ring || (n.bad ? rgba(P.red, .7) : n.kind === 'wait' ? P.amber : hot ? col : P.g); x.lineWidth = hot || state?.ring ? 2 : 1.5;
+  rr(l, tp, n.w, n.h, n.kind === 'final' ? n.h / 2 : 10); x.fill(); x.stroke();
+  if (n.kind === 'final') { rr(l + 5, tp + 5, n.w - 10, n.h - 10, (n.h - 10) / 2); x.stroke(); }
+  if (n.kind === 'parallel') {
+    // header + three regions divided by dashed lines, each with its own tiny running→done chain
+    x.strokeStyle = P.g; x.lineWidth = 1; x.beginPath(); x.moveTo(l, tp + 34); x.lineTo(l + n.w, tp + 34); x.stroke();
+    text('verify', l + 14, tp + 17, { font: MONO(500, 15), color: P.ink });
+    text('⫽ parallel', l + n.w - 12, tp + 17, { font: MONO(400, 11), color: P.ink4, align: 'right' });
+    x.setLineDash([4, 4]); x.strokeStyle = rgba(P.g, .9);
+    n.lanes.forEach((ln, i) => { const y = tp + 34 + i * 38.6; if (i) { x.beginPath(); x.moveTo(l, y); x.lineTo(l + n.w, y); x.stroke(); } const prog = state?.lanes?.[i] ?? 0; const cy = y + 19; text(ln, l + 14, cy, { font: MONO(400, 12.5), color: P.ink2 });
+      // mini chain: ○ running → ● done
+      x.setLineDash([]); x.strokeStyle = P.ink4; x.lineWidth = 1; x.beginPath(); x.moveTo(l + 92, cy); x.lineTo(l + n.w - 60, cy); x.stroke();
+      x.fillStyle = prog >= 1 ? P.green : prog > 0 ? P.bluehi : P.ink4; x.beginPath(); x.arc(l + 92 + (n.w - 152) * clamp(prog), cy, 3.5, 0, 7); x.fill();
+      text(prog >= 1 ? 'done' : prog > 0 ? 'running' : 'idle', l + n.w - 50, cy, { font: MONO(400, 11), color: prog >= 1 ? P.green : prog > 0 ? P.bluehi : P.ink4 }); x.setLineDash([4, 4]); });
+    x.setLineDash([]);
+  } else {
+    const glyph = n.kind === 'wait' ? '⌂ ' : n.kind === 'decision' ? '◇ ' : n.kind === 'final' ? (n.bad ? '⊗ ' : '◉ ') : '';
+    text(glyph + n.label, n.x, n.y, { font: MONO(500, 16), color: n.bad ? P.red : P.ink, align: 'center' });
+    if (n.kind === 'wait') text('human', n.x, n.y + n.h / 2 + 13, { font: MONO(400, 11), color: P.amber, align: 'center', track: 1 });
+    if (n.kind === 'decision') text('timer · 10 min', n.x, n.y + n.h / 2 + 13, { font: MONO(400, 11), color: P.ink4, align: 'center', track: 1 });
+    if (n.bad) text('needs a person', n.x, n.y + n.h / 2 + 13, { font: MONO(400, 11), color: P.ink4, align: 'center', track: 1 });
+  }
+  x.restore();
+}
+// the gates beat (9.0): guards and the human gate pulse once
+const gateBeat = t => { const p = win(t, T.gates, T.gates + 1.4); return p > 0 && p < 1 ? Math.sin(p * Math.PI) : 0; };
+function chart(t) {
+  // which nodes are hot (a run sits here) and the verify lanes
+  const state = {};
+  for (const a of AGENTS) { const w = whereIs(a.id, t); if (w && !w.moving) { const s = state[w.node.id] ||= { hot: 0, col: a.col }; s.hot = Math.min(1, s.hot + .6); } }
+  // verify lanes follow whoever arrived last; they run for 3 s
+  for (const a of AGENTS) { const w = whereIs(a.id, t); if (w && !w.moving && w.node.id === 'verify') { const s = state.verify; s.lanes = [0, 1, 2].map(i => clamp((t - w.since - i * .25) / 2.2)); if (RUNS[a.id].find(r => r[1] === 'edge:fail' && r[0] > w.since)) { const fails = RUNS[a.id].find(r => r[1] === 'edge:fail' && r[0] > w.since)[0]; if (t > fails - .5) s.lanes[2] = -1; } } }
+  if (t >= WAIT.from && t < WAIT.until) state.review = { ...state.review, ring: rgba(P.amber, .6 + .4 * Math.sin(t * 6)) };
+  const gb = gateBeat(t);
+  for (const e of E) edge(e, t, gb > 0 && (e.guard || e.human) ? gb > .3 : false);
+  if (gb > 0) { x.save(); x.globalAlpha = gb * .5; x.strokeStyle = P.amber; x.lineWidth = 2; rr(L('review') - 8, Tp('review') - 8, N.review.w + 16, N.review.h + 16, 16); x.stroke(); x.restore(); }
+  for (const k in N) node(N[k], t, state[k]);
+  // red lane for a failing test run
+  if (state.verify?.lanes?.[2] === -1) { const n = N.verify, tp = n.y - n.h / 2, cy = tp + 34 + 2 * 38.6 + 19; x.save(); x.fillStyle = P.sheet; x.fillRect(n.x - n.w / 2 + 92, cy - 10, n.w - 92, 20); x.restore(); text('tests', n.x - n.w / 2 + 14, cy, { font: MONO(400, 12.5), color: P.ink2 }); text('✗ 2 failed', n.x + n.w / 2 - 14, cy, { font: MONO(500, 11.5), color: P.red, align: 'right' }); }
+}
+function titleBlock(t) {
+  const a = out(win(t, 2.2, 3.0)); if (a <= 0) return;
+  const px = 1420, py = 860, w = 430, h = 116; x.save(); x.globalAlpha *= a;
+  x.fillStyle = rgba(P.page, .85); x.strokeStyle = P.g; x.lineWidth = 1; rr(px, py, w, h, 4); x.fill(); x.stroke();
+  x.beginPath(); x.moveTo(px, py + 40); x.lineTo(px + w, py + 40); x.moveTo(px + 230, py + 40); x.lineTo(px + 230, py + h); x.stroke();
+  const named = t >= 3.8, pub = t >= T.stamp;
+  text(named ? 'release-plannotator' : 'untitled', px + 14, py + 20, { font: MONO(500, 15), color: P.ink });
+  text(pub ? 'REV C' : 'DRAFT', px + w - 14, py + 20, { font: MONO(500, 12), color: pub ? P.green : P.ink3, align: 'right', track: 2 });
+  const built = BUILD.filter(k => t >= tIn(k)), ns = built.filter(k => N[k] && N[k].kind !== 'init').length, es = built.filter(k => EI[k]).length;
+  text(`STATES        ${String(ns).padStart(2)}`, px + 14, py + 60, { font: MONO(400, 11.5), color: P.ink3, track: 1 });
+  text(`TRANSITIONS   ${String(es).padStart(2)}`, px + 14, py + 80, { font: MONO(400, 11.5), color: P.ink3, track: 1 });
+  text(`HUMAN GATES   ${String(built.filter(k => EI[k]?.human).length).padStart(2)}`, px + 14, py + 100, { font: MONO(400, 11.5), color: P.amber, track: 1 });
+  text('MACHINE · SHEET 1/1', px + 244, py + 60, { font: MONO(400, 11.5), color: P.ink4, track: 1 });
+  text(pub ? 'PUBLISHED · SKILL.md' : 'NOT PUBLISHED', px + 244, py + 80, { font: MONO(400, 11.5), color: pub ? P.green : P.ink4, track: 1 });
+  text('localhost:7420/mcp', px + 244, py + 100, { font: MONO(400, 11.5), color: P.ink4, track: 1 });
+  x.restore();
+}
+// publish: a sweep across the sheet, then the stamp
+function sweep(t) {
+  const p = win(t, ...T.sweep); if (p <= 0 || p >= 1) return;
+  const sx = lerp(-100, 2020, io(p)); const g = x.createLinearGradient(sx - 220, 0, sx, 0); g.addColorStop(0, rgba(P.bluehi, 0)); g.addColorStop(1, rgba(P.bluehi, .16)); x.fillStyle = g; x.fillRect(sx - 220, 0, 220, 1080); x.fillStyle = rgba(P.bluehi, .6); x.fillRect(sx - 1, 0, 2, 1080);
+}
+
+// ---- tokens: the agents on the chart ---------------------------------------------------------------------------------
+function tokens(t) {
+  for (const a of AGENTS) {
+    const w = tokenPos(a.id, t); if (!w) continue;
+    const born = out(win(t, RUNS[a.id][0][0], RUNS[a.id][0][0] + .35)), r = 15 * back(born);
+    // trail while moving
+    if (w.moving) { x.save(); x.strokeStyle = rgba(a.col, .5); x.lineWidth = 3; x.lineCap = 'round'; x.beginPath(); for (let k = 0; k < 8; k++) { const q = whereIs(a.id, t - k * .03); if (!q) break; x.globalAlpha = .4 * (1 - k / 8); if (k === 0) x.moveTo(q.x, q.y); else x.lineTo(q.x, q.y); } x.stroke(); x.restore(); }
+    const rej = REJECT.who === a.id && t >= REJECT.t && t < REJECT.t + 1.0 ? Math.sin(win(t, REJECT.t, REJECT.t + 1.0) * Math.PI) : 0;
+    const waiting = WAIT.who === a.id && t >= WAIT.from && t < WAIT.until;
+    x.save(); x.translate(w.x, w.y + (rej ? Math.sin(t * 60) * 2.5 * rej : 0));
+    if (born < 1) { const s = born; x.scale(s, s); }
+    x.shadowColor = rgba(rej ? P.red : waiting ? P.amber : a.col, .7); x.shadowBlur = 18;
+    x.fillStyle = P.page; x.strokeStyle = rej ? P.red : waiting ? P.amber : a.col; x.lineWidth = 2; x.beginPath(); x.arc(0, 0, r, 0, 7); x.fill(); x.stroke();
+    x.shadowBlur = 0; mark(a.id, rej ? P.red : a.col, 0, 0, 17);
+    x.restore();
+    if (rej) { x.save(); x.globalAlpha = rej; x.strokeStyle = P.red; x.lineWidth = 2; x.beginPath(); x.arc(w.x, w.y, 15 + 22 * win(t, REJECT.t, REJECT.t + 1), 0, 7); x.stroke(); x.restore(); }
+  }
+  // the rejected move: a ghost edge that is not on the chart, struck through
+  if (t >= REJECT.t && t < REJECT.t + 2.4) { const a = out(win(t, REJECT.t, REJECT.t + .4)) * (1 - win(t, REJECT.t + 1.8, REJECT.t + 2.4)); const w = tokenPos('codex', t); if (w) { x.save(); x.globalAlpha = a; x.strokeStyle = P.red; x.lineWidth = 1.6; x.setLineDash([5, 6]); x.beginPath(); x.moveTo(w.x, w.y); x.bezierCurveTo(w.x + 120, w.y - 140, L('ship') - 120, Y - 140, L('ship'), Y - 8); x.stroke(); x.setLineDash([]); const mx = (w.x + L('ship')) / 2, my = Y - 112; x.lineWidth = 2.2; x.beginPath(); x.moveTo(mx - 9, my - 9); x.lineTo(mx + 9, my + 9); x.moveTo(mx + 9, my - 9); x.lineTo(mx - 9, my + 9); x.stroke(); x.restore(); } }
+}
+
+// ---- callouts: what the server allows, what the agent is doing --------------------------------------------------------
+function bubble(px, py, lines, { col = P.ink, w = 250, alpha = 1, anchor = 'bl' } = {}) {
+  if (alpha <= 0) return; const h = 18 + lines.length * 20; const bx = anchor.includes('r') ? px - w : px, by = anchor.includes('b') ? py - h : py;
+  x.save(); x.globalAlpha *= alpha; x.fillStyle = rgba(P.page, .94); x.strokeStyle = col; x.lineWidth = 1.2; rr(bx, by, w, h, 6); x.fill(); x.stroke();
+  lines.forEach((l, i) => text(l.s, bx + 12, by + 18 + i * 20, { font: MONO(l.b ? 500 : 400, 12.5), color: l.c || (l.b ? col : P.ink2) })); x.restore();
+}
+function callouts(t) {
+  // one slot above build (clear of the chips docked on the state), one above review
+  const bx = L('build'), by = Tp('build') - 48, rx = L('review'), ry = Tp('review') - 48;
+  const c1 = out(win(t, 21.6, 22.0)) * (1 - win(t, 24.2, 24.5)); // server: allowed next
+  bubble(bx, by, [{ s: 'server · allowed next', b: 1 }, { s: 'built   fail', c: P.bluehi }], { col: P.bluehi, w: 210, alpha: c1 });
+  const c2 = out(win(t, 24.3, 24.7)) * (1 - win(t, 26.6, 26.9)); // the agent's call
+  bubble(bx, by, [{ s: 'claude code · inside build', b: 1 }, { s: '› edit src/refund.ts' }, { s: '› bun test  ·  42 passed' }, { s: '› git commit -m "round half up"' }, { s: 'the how is the agent\'s call', c: P.ink4 }], { col: '#e8956a', w: 262, alpha: c2 });
+  const c3 = out(win(t, 27.4, 27.7)) * (1 - win(t, 29.3, 29.6)); // rejected
+  bubble(bx, by, [{ s: '✗ rejected', b: 1 }, { s: '"ship" is not an event of build' }, { s: 'allowed: built · fail', c: P.ink4 }], { col: P.red, w: 272, alpha: c3 });
+  const c4 = out(win(t, 30.2, 30.6)) * (1 - win(t, APPROVE, APPROVE + .3)); // waiting
+  bubble(rx, ry, [{ s: '◌ waiting on you', b: 1 }, { s: 'run_8f2k · claude code' }, { s: 'approve  ·  request changes', c: P.ink4 }], { col: P.amber, w: 236, alpha: c4 });
+  const c5 = out(win(t, APPROVE, APPROVE + .3)) * (1 - win(t, 34.0, 34.3)); // approved
+  bubble(rx, ry, [{ s: '✓ approved · by you', b: 1 }], { col: P.green, w: 200, alpha: c5 });
+  // determinism / emergence: two labels on the wide chart
+  const c6 = out(win(t, 33.4, 33.9)) * (1 - win(t, 36.6, 36.9));
+  if (c6 > 0) { text('every transition is fixed', 960, 262, { font: SANS(500, 20), color: P.ink2, align: 'center', alpha: c6 }); text('DETERMINISM', 960, 236, { font: MONO(500, 11), color: P.bluehi, align: 'center', alpha: c6, track: 3 }); text('what happens inside a state is the agent\'s', 960, 846, { font: SANS(500, 20), color: P.ink2, align: 'center', alpha: c6 }); text('EMERGENCE', 960, 820, { font: MONO(500, 11), color: '#e8956a', align: 'center', alpha: c6, track: 3 }); }
+}
+
+// ---- HUD (unscaled) --------------------------------------------------------------------------------------------------
+function captions(t) { let cur = null, nxt = null; for (const cp of CAPTIONS) { if (t >= cp[0]) cur = cp; else { nxt = cp; break; } } if (!cur || !cur[1]) return; const a = out(win(t, cur[0], cur[0] + .5)) * (nxt ? 1 - win(t, nxt[0] - .35, nxt[0]) : 1); text(cur[1], 72, 122, { font: SANS(500, 24), color: P.ink2, alpha: a }); }
+function skillCard(t) {
+  const a = out(win(t, T.card, T.card + .5)) * (1 - win(t, 21.0, 21.5)); if (a <= 0) return;   // gone once the agents have it
+  // the card flies in small copies to each agent during T.fly
+  const px = 1480, py = 64, w = 368, h = 232; x.save(); x.globalAlpha *= a; x.translate(0, (1 - a) * -16);
+  x.fillStyle = rgba('#0f0f14', .96); x.strokeStyle = P.g; x.lineWidth = 1; rr(px, py, w, h, 8); x.fill(); x.stroke(); x.beginPath(); x.moveTo(px, py + 36); x.lineTo(px + w, py + 36); x.stroke();
+  text('SKILL.md', px + 14, py + 18, { font: MONO(500, 13), color: P.ink }); text('release-plannotator · rev c', px + w - 14, py + 18, { font: MONO(400, 11.5), color: P.green, align: 'right' });
+  const rows = [['begin', 'inputs, preflight → the first card'], ['transition', 'run, event → the next card, or why not'], ['fail', 'run, code → blocked, what it needs'], ['', ''], ['states', 'plan build verify review stage'], ['', 'canary ship blocked rollback'], ['gates', 'review · human   canary · timer'], ['mcp', 'http://localhost:7420/mcp']];
+  rows.forEach(([k, v], i) => { text(k, px + 14, py + 56 + i * 21, { font: MONO(500, 12), color: P.bluehi }); text(v, px + 104, py + 56 + i * 21, { font: MONO(400, 12), color: P.ink2 }); });
+  x.restore();
+}
+function agentsRow(t) {
+  const a = out(win(t, T.agents, T.agents + .6)) * (1 - win(t, 36.9, 37.4)); if (a <= 0) return;
+  const y = 1000; AGENTS.forEach((ag, i) => {
+    const px = 112 + i * 176, d = out(win(t, T.agents + i * .12, T.agents + .5 + i * .12));
+    x.save(); x.globalAlpha *= a * d; x.translate(0, (1 - d) * 12);
+    mark(ag.id, ag.col, px, y - 6, 30); text(ag.name, px, y + 24, { font: MONO(400, 12), color: P.ink3, align: 'center' });
+    // the skill arrives: a small card flies from the top-right card to the mark, then a tick
+    const f = win(t, T.fly[0] + i * .14, T.fly[1] + i * .14), fe = io(f);
+    if (f > 0 && f < 1) { const fx = lerp(1664, px, fe), fy = lerp(180, y - 6, fe) - Math.sin(f * Math.PI) * 120; x.fillStyle = P.ink; x.strokeStyle = P.g; rr(fx - 9, fy - 12, 18, 24, 2); x.fill(); x.stroke(); x.fillStyle = P.ink4; x.fillRect(fx - 5, fy - 6, 10, 1.5); x.fillRect(fx - 5, fy - 2, 10, 1.5); x.fillRect(fx - 5, fy + 2, 7, 1.5); }
+    if (f >= 1) { const q = out(win(t, T.fly[1] + i * .14, T.fly[1] + .3 + i * .14)); text('✓ loaded', px, y + 42, { font: MONO(400, 11), color: P.green, align: 'center', alpha: q }); }
+    x.restore();
+  });
+}
+function consoleLog(t) {
+  const lines = CONSOLE.filter(l => t >= l[0]).slice(-6), a0 = 1 - win(t, 36.9, 37.4); if (!lines.length || a0 <= 0) return;
+  const px = 72, py = 954 - lines.length * 22; const colors = { ink: P.ink2, ok: P.green, no: P.red, wait: P.amber, dim: P.ink4 };
+  // a panel behind the lines so the log reads as an overlay when the chart is zoomed under it
+  x.save(); x.globalAlpha *= a0 * out(win(t, CONSOLE[0][0], CONSOLE[0][0] + .4)); x.fillStyle = rgba('#0c0c10', .86); x.strokeStyle = P.glo; x.lineWidth = 1; rr(px - 20, py - 16, 640, lines.length * 22 + 28, 8); x.fill(); x.stroke(); x.restore();
+  lines.forEach((l, i) => { const a = out(win(t, l[0], l[0] + .3)) * a0, ag = AGENTS.find(q => q.id === l[1]); const y = py + i * 22; if (ag) mark(ag.id, ag.col, px + 8, y, 13, a); else text('you', px + 8, y, { font: MONO(500, 11.5), color: P.amber, align: 'center', alpha: a }); text(l[2], px + 28, y, { font: MONO(l[3] === 'no' ? 500 : 400, 13), color: colors[l[3]], alpha: a }); });
+}
+function ledger(t) {
+  const a = out(win(t, ...T.ledger)) * (1 - win(t, T.brand - .1, T.brand + .5)); if (a <= 0) return;
+  const px = 360, py = 300, w = 1200, h = 440; x.save(); x.globalAlpha *= a; x.translate(0, (1 - a) * 20);
+  x.fillStyle = rgba('#0f0f14', .97); x.strokeStyle = P.g; x.lineWidth = 1; rr(px, py, w, h, 10); x.fill(); x.stroke();
+  text('RUNS · TODAY', px + 24, py + 30, { font: MONO(500, 12), color: P.ink3, track: 3 });
+  const rolled = Math.round(lerp(1283, 1284, out(win(t, 38.9, 39.5)))); text(rolled.toLocaleString(), px + w - 24, py + 30, { font: MONO(600, 22), color: P.ink, align: 'right' });
+  x.strokeStyle = P.g; x.beginPath(); x.moveTo(px, py + 52); x.lineTo(px + w, py + 52); x.stroke();
+  const cols = [px + 24, px + 70, px + 190, px + 420, px + 900, px + w - 24];
+  ['', 'RUN', 'MACHINE', 'PATH', 'STATE', 'TIME'].forEach((hd, i) => text(hd, cols[i], py + 72, { font: MONO(500, 11), color: P.ink4, align: i === 5 ? 'right' : 'left', track: 2 }));
+  const rows = [
+    ['claude', 'run_8f2k', 'release-plannotator', 'plan build verify review stage canary ship', '◉ ship', P.green, '19:02'],
+    ['opencode', 'run_c3d8', 'release-plannotator', 'plan build verify review', '◌ review · waiting', P.amber, '08:41'],
+    ['codex', 'run_9a1c', 'release-plannotator', 'plan build ✗ build verify fail build', '■ build · retry 1/3', P.bluehi, '14:12'],
+    ['gemini', 'run_b7e0', 'release-plannotator', 'plan build verify fail build verify', '■ verify', P.bluehi, '11:57'],
+    ['cursor', 'run_d4f1', 'code-review-loop', 'intake triage review', '◌ review · waiting', P.amber, '03:20'],
+    ['claude', 'run_e9a2', 'migrate-db', 'snapshot migrate verify', '◉ done', P.green, '22:46'],
+    ['gemini', 'run_f0c5', 'migrate-db', 'snapshot migrate verify rollback', '⊗ blocked · needs a person', P.red, '31:08'],
+  ];
+  rows.forEach((r, i) => { const y = py + 104 + i * 42, ra = out(win(t, T.ledger[0] + .25 + i * .07, T.ledger[0] + .55 + i * .07)); const ag = AGENTS.find(q => q.id === r[0]); mark(ag.id, ag.col, cols[0] + 8, y, 16, ra); text(r[1], cols[1], y, { font: MONO(500, 13), color: P.ink, alpha: ra }); text(r[2], cols[2], y, { font: MONO(400, 13), color: P.ink2, alpha: ra }); text(r[3], cols[3], y, { font: MONO(400, 12), color: P.ink3, alpha: ra }); text(r[4], cols[4], y, { font: MONO(500, 12.5), color: r[5], alpha: ra }); text(r[6], cols[5], y, { font: MONO(400, 12.5), color: P.ink4, align: 'right', alpha: ra }); if (i) { x.save(); x.globalAlpha *= ra * .6; x.strokeStyle = P.glo; x.beginPath(); x.moveTo(px + 24, y - 21); x.lineTo(px + w - 24, y - 21); x.stroke(); x.restore(); } });
+  // machines list, right of the ledger
+  const mx = px + w + 40; ['release-plannotator  ·  412', 'code-review-loop  ·  688', 'migrate-db  ·  184'].forEach((m, i) => text(m, mx, py + 72 + i * 24, { font: MONO(400, 12.5), color: i ? P.ink3 : P.ink, alpha: a }));
+  text('MACHINES', mx, py + 30, { font: MONO(500, 12), color: P.ink3, track: 3, alpha: a });
+  x.restore();
+}
+function hud(t) {
+  const a = out(win(t, T.title, T.title + .6)) * (1 - win(t, T.brand - .2, T.brand + .4));
+  text('machine', 72, 78, { font: SANS(600, 40), color: P.ink, alpha: a, track: -1.6 });
+  captions(t);
+  // eyebrow: the machine and the run
+  const e1 = t < 3.8 ? 'UNTITLED  ·  DRAFT' : t < T.stamp ? 'RELEASE-PLANNOTATOR  ·  DRAFT' : 'RELEASE-PLANNOTATOR  ·  REV C  ·  PUBLISHED';
+  text(e1, 72, 154, { font: MONO(400, 11.5), color: t >= T.stamp ? P.green : P.ink4, alpha: a * out(win(t, 2.2, 2.8)), track: 2.5 });
+  const a2 = out(win(t, T.agents, T.agents + .5)) * a; text('5 AGENTS  ·  LIVE  ·  MCP', 72, 176, { font: MONO(400, 11.5), color: P.ink4, alpha: a2, track: 2.5 });
+  skillCard(t); agentsRow(t); consoleLog(t); ledger(t);
+}
+function brand(t) {
+  const a = out(win(t, T.brand, T.brand + .9)); if (a <= 0) return;
+  x.save(); x.fillStyle = rgba(P.page, .78 * a); x.fillRect(0, 0, 1920, 1080);
+  x.globalAlpha = a; text('machine', 960, 470, { font: SANS(600, 168), color: P.ink, align: 'center', track: -8 });
+  const b = out(win(t, T.tag, T.tag + .7)); text('Build the line. Let them run it.', 960, 580, { font: SANS(500, 34), color: P.ink2, align: 'center', alpha: b });
+  const u = out(win(t, T.url, T.url + .6)); text('STATE MACHINES FOR AGENTS  ·  LOCALHOST:7420', 960, 650, { font: MONO(400, 13), color: P.ink4, align: 'center', alpha: u, track: 4 });
+  // the five marks under the brand
+  AGENTS.forEach((ag, i) => mark(ag.id, P.ink4, 960 + (i - 2) * 56, 720, 22, u * .9));
+  x.restore();
+}
+const grain = document.createElement('canvas'); grain.width = grain.height = 256; { const g = grain.getContext('2d'), im = g.createImageData(256, 256); for (let i = 0; i < im.data.length; i += 4) { const v = 128 + (Math.random() - .5) * 90; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } g.putImageData(im, 0, 0); }
+function post(t, f) {
+  const v = x.createRadialGradient(960, 540, 420, 960, 540, 1250); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.6)'); x.fillStyle = v; x.fillRect(0, 0, 1920, 1080);
+  x.save(); x.globalAlpha = .04; x.globalCompositeOperation = 'overlay'; x.translate((f * 37) % 256, (f * 91) % 256); x.fillStyle = x.createPattern(grain, 'repeat'); x.fillRect(-256, -256, 2432, 1592); x.restore();
+  const fo = win(t, ...T.fade); if (fo > 0) { x.fillStyle = `rgba(0,0,0,${fo})`; x.fillRect(0, 0, 1920, 1080); }
+}
+// the world is drawn through this; when it has to go soft (ledger, brand) it is drawn small and scaled back up, which is
+// cheap on the CPU where a canvas blur filter is not
+const soft = document.createElement('canvas'), sx = soft.getContext('2d');
+function world(t, cm) { x.translate(960, 540); x.scale(cm.z, cm.z); x.translate(-cm.cx, -cm.cy); sheet(t); chart(t); tokens(t); callouts(t); sweep(t); titleBlock(t); }
+function draw(t) {
+  const f = Math.round(t * FPS), cm = cam(t), dim = t >= T.ledger[0] ? 1 - .6 * out(win(t, ...T.ledger)) : 1, blur = win(t, T.brand, T.brand + .9) * 8 + win(t, ...T.ledger) * 2;
+  x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, 1920, 1080);
+  if (blur > 0) {
+    const k = 1 / (1 + blur * .9); soft.width = Math.round(1920 * k); soft.height = Math.round(1080 * k);
+    const main = x; window.x = sx; sx.setTransform(k, 0, 0, k, 0, 0); world(t, cm); window.x = main;
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(soft, 0, 0, 1920, 1080);
+  } else { x.save(); world(t, cm); x.restore(); }
+  if (dim < 1) { x.fillStyle = `rgba(10,10,12,${1 - dim})`; x.fillRect(0, 0, 1920, 1080); }
+  hud(t); brand(t); post(t, f);
+}
+// preload the marks in every colour they appear in
+for (const a of AGENTS) { icon(a.id, a.col); icon(a.id, P.ink4); icon(a.id, P.red); }
+const ready = Promise.all([SANS(600, 40), SANS(500, 24), SANS(600, 168), MONO(400, 12), MONO(500, 13), MONO(600, 22)].map(f => document.fonts.load(f)).concat(iconPromises)).then(() => true);
+window.__film = { duration: DURATION, fps: FPS, ready, seek: t => draw(t) };
+const q = new URLSearchParams(location.search);
+ready.then(() => { if (q.has('play')) { const t0 = performance.now() - (+q.get('t') || 0) * 1000; (function loop() { draw(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(); } else draw(+q.get('t') || 0); });
+</script></body></html>

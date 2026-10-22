@@ -1,0 +1,126 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="fonts.css">
+<style>
+  .hl { position: absolute; left: 72px; top: 56px; font: 600 56px/1.02 var(--sans); letter-spacing: -0.035em; color: var(--ink); }
+  .hl .dim { color: var(--ink-3); }
+  .hl small { display: block; margin-top: 14px; font: 400 15px/1 var(--mono); letter-spacing: 0.18em; text-transform: uppercase; color: var(--blue-hi); }
+  .legend { position: absolute; right: 72px; top: 64px; font: 400 13px/1.9 var(--mono); color: var(--ink-3); letter-spacing: 0.06em; text-align: right; }
+  .legend b { color: var(--ink); font-weight: 500; }
+  .foot { position: absolute; left: 72px; bottom: 44px; font: 400 13px/1.6 var(--mono); color: var(--ink-4); letter-spacing: 0.1em; }
+</style></head><body><div id="stage">
+<canvas id="c" width="1920" height="1080"></canvas>
+<div class="hl">The floor runs itself.<br><span class="dim">Agents work the stations.</span><small>release-plannotator · run 8f2k · live</small></div>
+<div class="legend"><b>■</b> a run on the line<br><b>▣</b> station · an agent inside<br><span style="color:var(--amber)">●</span> human gate · waiting<br><span style="color:var(--red)">●</span> refused · off the map<br><span style="color:var(--green)">●</span> ok · checked by the server</div>
+<div class="foot">MACHINE · STATE MACHINES FOR AGENTS · EVERY MOVE CHECKED · EVERY RUN KEPT</div>
+<script>
+// A frame in the register of a top-down factory game: a tiled floor, belts with chevrons, assemblers with lamps and plates,
+// inserter arms at the gates. The state machine IS the floor plan; a run is a part riding the belts.
+const c = document.getElementById('c'), x = c.getContext('2d');
+const P = { page: '#0a0a0c', tile: '#0f0f13', tile2: '#121217', seam: '#18181e', ink: '#ededef', ink2: '#a3a3ad', ink3: '#85858f', ink4: '#4a4a53', g: '#3a3a42', glo: '#2e2e35', ghi: '#55555e', blue: '#3b82f6', bluehi: '#93c2ff', red: '#ff5d62', amber: '#f2b45a', green: '#6ee7a0', steel: '#1c1c22', steel2: '#24242b', steel3: '#2d2d35', dark: '#111115', rail: '#3d3d46' };
+const MONO = (w, s) => `${w} ${s}px "Geist Mono"`;
+const rr = (px, py, w, h, r) => { x.beginPath(); x.roundRect(px, py, w, h, r); };
+const hash = (i, j, k = 0) => { let h = (i * 374761393 + j * 668265263 + k * 1274126177) | 0; h = Math.imul(h ^ (h >>> 13), 1103515245); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+const T = 40, FX = 72, FY = 250, FW = 1776, FH = 730;   // the floor
+function floor() {
+  x.fillStyle = P.page; x.fillRect(0, 0, 1920, 1080);
+  for (let j = 0; j * T < FH; j++) for (let i = 0; i * T < FW; i++) {
+    const px = FX + i * T, py = FY + j * T, v = hash(i, j);
+    x.fillStyle = v < .12 ? P.tile2 : P.tile; x.fillRect(px, py, T, T);
+    x.strokeStyle = P.seam; x.lineWidth = 1; x.strokeRect(px + .5, py + .5, T - 1, T - 1);
+    if (v > .93) { x.fillStyle = '#1a1a21'; x.fillRect(px + 8 + (v * 20 | 0), py + 8 + (hash(j, i) * 20 | 0), 4, 4); }
+    if (v > .985) { x.fillStyle = '#0c0c0f'; x.fillRect(px + 6, py + 6, T - 12, T - 12); }
+  }
+  // service pipes along the top edge, and a cable tray down the right
+  for (let k = 0; k < 2; k++) { const py = FY + 12 + k * 14; x.fillStyle = k ? P.g : P.glo; x.fillRect(FX, py, FW, 6); for (let i = 0; i < FW; i += 160) { x.fillStyle = P.ghi; x.fillRect(FX + i + 70, py - 2, 10, 10); } }
+  x.fillStyle = P.glo; x.fillRect(FX + FW - 24, FY, 8, FH); for (let j = 0; j < FH; j += 48) { x.fillStyle = P.ghi; x.fillRect(FX + FW - 28, FY + j + 20, 16, 4); }
+  // a painted aisle line and a hazard strip in front of the human gate
+  x.save(); x.setLineDash([16, 12]); x.strokeStyle = P.ink4; x.lineWidth = 2; x.globalAlpha = .6; x.beginPath(); x.moveTo(FX + 60, FY + FH - 60); x.lineTo(FX + FW - 60, FY + FH - 60); x.stroke(); x.restore();
+  // vignette
+  const g = x.createRadialGradient(960, 600, 300, 960, 600, 1300); g.addColorStop(0, 'rgba(10,10,12,0)'); g.addColorStop(1, 'rgba(10,10,12,.85)'); x.fillStyle = g; x.fillRect(0, 0, 1920, 1080);
+}
+function belt(pts, items = [], { fade = 1 } = {}) {
+  x.save(); x.globalAlpha = fade; x.lineJoin = 'round';
+  const path = () => { x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) x.lineTo(p[0], p[1]); };
+  path(); x.strokeStyle = 'rgba(0,0,0,.6)'; x.lineWidth = 38; x.stroke();
+  path(); x.strokeStyle = P.rail; x.lineWidth = 32; x.stroke();
+  path(); x.strokeStyle = P.dark; x.lineWidth = 24; x.stroke();
+  for (let s = 0; s < pts.length - 1; s++) {
+    const [ax, ay] = pts[s], [bx, by] = pts[s + 1], L = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / L, uy = (by - ay) / L;
+    for (let d = 12; d < L - 6; d += 18) { const cx = ax + ux * d, cy = ay + uy * d; x.strokeStyle = 'rgba(147,194,255,.26)'; x.lineWidth = 2; x.beginPath(); x.moveTo(cx - ux * 5 - uy * 7, cy - uy * 5 + ux * 7); x.lineTo(cx + ux * 2, cy + uy * 2); x.lineTo(cx - ux * 5 + uy * 7, cy - uy * 5 - ux * 7); x.stroke(); }
+    // roller ends every so often
+    for (let d = 0; d <= L; d += 90) { const cx = ax + ux * d, cy = ay + uy * d; x.fillStyle = P.ghi; x.fillRect(cx - uy * 18 - 2, cy + ux * 18 - 2, 4, 4); x.fillRect(cx + uy * 18 - 2, cy - ux * 18 - 2, 4, 4); }
+  }
+  x.restore();
+  for (const it of items) item(...it);
+}
+function item(px, py, col = P.bluehi) {
+  x.save(); x.shadowColor = col; x.shadowBlur = 16; x.fillStyle = col; x.fillRect(px - 8, py - 8, 16, 16); x.restore();
+  x.fillStyle = 'rgba(255,255,255,.4)'; x.fillRect(px - 8, py - 8, 16, 3); x.fillStyle = 'rgba(0,0,0,.35)'; x.fillRect(px - 8, py + 5, 16, 3);
+}
+// an assembler: body, inset, bolts, vents, a screen with its work, a plate with its name, a lamp
+function station(px, py, w, h, name, { lamp = P.green, screen = null, glyph = '', fade = 1 } = {}) {
+  x.save(); x.globalAlpha = fade;
+  x.save(); x.shadowColor = 'rgba(0,0,0,.75)'; x.shadowBlur = 26; x.shadowOffsetY = 10; x.fillStyle = P.steel; rr(px, py, w, h, 7); x.fill(); x.restore();
+  x.strokeStyle = P.ghi; x.lineWidth = 1.5; rr(px + .5, py + .5, w - 1, h - 1, 7); x.stroke();
+  x.fillStyle = P.steel2; rr(px + 8, py + 8, w - 16, h - 16, 4); x.fill(); x.strokeStyle = P.glo; x.lineWidth = 1; rr(px + 8.5, py + 8.5, w - 17, h - 17, 4); x.stroke();
+  for (const [bx, by] of [[px + 10, py + 10], [px + w - 10, py + 10], [px + 10, py + h - 10], [px + w - 10, py + h - 10]]) { x.fillStyle = P.ghi; x.beginPath(); x.arc(bx, by, 2.8, 0, 7); x.fill(); x.fillStyle = P.dark; x.fillRect(bx - 2.4, by - .7, 4.8, 1.4); }
+  for (let k = 0; k < 6; k++) { x.fillStyle = P.dark; x.fillRect(px + w - 32, py + 20 + k * 7, 18, 3); }
+  x.save(); x.shadowColor = lamp; x.shadowBlur = 18; x.fillStyle = lamp; x.beginPath(); x.arc(px + 24, py + 24, 5.5, 0, 7); x.fill(); x.restore();
+  // the screen: what the station is doing
+  x.fillStyle = P.dark; rr(px + 42, py + 16, w - 86, h - 66, 4); x.fill(); x.strokeStyle = P.glo; rr(px + 42.5, py + 16.5, w - 87, h - 67, 4); x.stroke();
+  if (screen) screen(px + 52, py + 28, w - 106, h - 90);
+  x.fillStyle = P.dark; rr(px + 14, py + h - 38, w - 28, 26, 3); x.fill();
+  x.fillStyle = P.ink; x.font = MONO(500, 15); x.textBaseline = 'middle'; x.textAlign = 'left'; x.fillText((glyph ? glyph + ' ' : '') + name, px + 26, py + h - 25);
+  x.restore();
+}
+const SCREENS = {
+  list: (sx, sy, w, h) => { [1, .7, .5, .9].forEach((f, i) => { x.fillStyle = i < 2 ? P.ink3 : P.ink4; x.fillRect(sx, sy + i * 11, w * f * .8, 4); }); },
+  agent: (sx, sy, w, h) => { x.fillStyle = P.bluehi; x.font = MONO(500, 12); x.textBaseline = 'alphabetic'; x.fillText('✱ claude code', sx, sy + 8); x.fillStyle = P.ink3; x.font = MONO(400, 11); ['edit refund.ts', 'bun test · 42 ok', 'commit a81f2c'].forEach((l, i) => x.fillText(l, sx, sy + 26 + i * 14));  },
+  test: (sx, sy, w, h) => { x.font = MONO(400, 11); x.textBaseline = 'alphabetic'; [['✓ unit · 42', P.green], ['✓ types', P.green], ['✗ e2e · 1', P.red], ['↻ retry', P.ink3]].forEach(([l, col], i) => { x.fillStyle = col; x.fillText(l, sx, sy + 10 + i * 14); }); },
+  person: (sx, sy, w, h) => { x.strokeStyle = P.amber; x.lineWidth = 2; x.beginPath(); x.arc(sx + 16, sy + 12, 8, 0, 7); x.stroke(); x.beginPath(); x.arc(sx + 16, sy + 40, 16, Math.PI, 0); x.stroke(); x.fillStyle = P.amber; x.font = MONO(400, 11); x.textBaseline = 'alphabetic'; x.fillText('waiting', sx + 40, sy + 14); x.fillStyle = P.ink3; x.fillText('on you · 2m', sx + 40, sy + 30); x.fillStyle = P.amber; x.fillRect(sx + 40, sy + 44, 60, 16); x.fillStyle = P.page; x.fillText('approve', sx + 46, sy + 56); },
+  box: (sx, sy, w, h) => { x.save(); x.shadowColor = P.bluehi; x.shadowBlur = 14; x.fillStyle = P.bluehi; x.fillRect(sx + 10, sy + 10, 28, 28); x.restore(); x.fillStyle = P.ink3; x.font = MONO(400, 11); x.textBaseline = 'alphabetic'; x.fillText('v2.4.1', sx + 50, sy + 22); x.fillText('↑ npm', sx + 50, sy + 36); },
+};
+function gate(px, py, state = 'ok') {
+  const col = state === 'ok' ? P.green : state === 'no' ? P.red : P.amber;
+  x.fillStyle = P.steel; rr(px - 11, py - 60, 22, 22, 3); x.fill(); x.strokeStyle = P.ghi; x.lineWidth = 1; rr(px - 10.5, py - 59.5, 21, 21, 3); x.stroke();
+  x.strokeStyle = P.ink2; x.lineWidth = 3; x.lineCap = 'round'; x.beginPath(); x.moveTo(px, py - 40); x.lineTo(px, py - 14); x.stroke();
+  x.fillStyle = P.ink2; x.fillRect(px - 7, py - 16, 14, 4);
+  x.save(); x.shadowColor = col; x.shadowBlur = 16; x.fillStyle = col; x.beginPath(); x.arc(px, py - 49, 4.5, 0, 7); x.fill(); x.restore();
+  x.fillStyle = col; x.font = MONO(500, 10); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(state === 'ok' ? 'OK' : state === 'no' ? 'NO' : 'WAIT', px, py - 72); x.textAlign = 'left';
+}
+function label(txt, px, py, col = P.ink3, size = 12, w = 400) { x.fillStyle = col; x.font = MONO(w, size); x.textBaseline = 'middle'; x.textAlign = 'left'; x.fillText(txt, px, py); }
+function line(name, run, y, cells, { fade = 1, items = [], gates = [], notes = [] } = {}) {
+  const SW = 200, SH = 128, xs = cells.map(c => c[0]);
+  for (let i = 0; i < cells.length - 1; i++) belt([[xs[i] + SW, y], [xs[i + 1], y]], [], { fade });
+  for (const it of items) item(...it);
+  cells.forEach(([cx, nm, o]) => station(cx, y - SH / 2, nm === 'shipped' ? 170 : SW, SH, nm, { ...o, fade }));
+  x.save(); x.globalAlpha = fade; for (const [gx, st] of gates) gate(gx, y, st); for (const [t, lx, ly, col, sz] of notes) label(t, lx, ly, col, sz); label(name + ' · ' + run, xs[0], y - SH / 2 - 22, P.ink3, 12, 500); x.restore();
+}
+async function draw() {
+  await Promise.all(['400 12px "Geist Mono"', '500 12px "Geist Mono"'].map(f => document.fonts.load(f)));
+  floor();
+  // the main line: release-plannotator
+  const Y = 590, X0 = 150, GAP = 290;
+  const cells = [[X0, 'plan', { lamp: P.green, screen: SCREENS.list }], [X0 + GAP, 'build', { lamp: P.blue, screen: SCREENS.agent }], [X0 + 2 * GAP, 'test', { lamp: P.green, glyph: '◇', screen: SCREENS.test }], [X0 + 3 * GAP, 'review', { lamp: P.amber, glyph: '⌂', screen: SCREENS.person }], [X0 + 4 * GAP, 'merged', { lamp: P.bluehi, glyph: '◉', screen: SCREENS.box }]];
+  // the fail loop under the line, before the stations so it sits beneath them
+  belt([[X0 + 2 * GAP + 100, Y + 64], [X0 + 2 * GAP + 100, Y + 150], [X0 + GAP + 100, Y + 150], [X0 + GAP + 100, Y + 64]], [[X0 + 2 * GAP + 100, Y + 112], [X0 + GAP + 170, Y + 150]]);
+  label('fail', X0 + GAP + 150, Y + 172, P.ink3, 12);
+  line('release-plannotator', 'run 8f2k', Y, cells, {
+    items: [[X0 + 200 + 40, Y], [X0 + GAP + 200 + 56, Y], [X0 + 2 * GAP + 200 + 30, Y], [X0 + 2 * GAP + 200 + 70, Y]],
+    gates: [[X0 + 200 + 72, 'ok'], [X0 + GAP + 200 + 24, 'no'], [X0 + 2 * GAP + 200 + 50, 'ok'], [X0 + 3 * GAP + 200 + 45, 'wait']],
+    notes: [['planned', X0 + 206, Y + 32], ['built', X0 + GAP + 206, Y + 32], ['pass', X0 + 2 * GAP + 206, Y + 32], ['approved', X0 + 3 * GAP + 206, Y + 32],
+      ['✗ "ship" is not an event of build', X0 + GAP + 200 - 60, Y - 108, P.red, 13, 500]],
+  });
+  // two more lines, quieter, behind: the floor is a floor
+  const Y2 = 380, X2 = 300;
+  line('code-review-loop', 'run 7c1d', Y2, [[X2, 'triage', { lamp: P.green, screen: SCREENS.list }], [X2 + 300, 'review', { lamp: P.amber, glyph: '⌂', screen: SCREENS.person }], [X2 + 600, 'changes', { lamp: P.blue, screen: SCREENS.agent }], [X2 + 900, 'merge', { lamp: P.green, glyph: '◉', screen: SCREENS.box }]], { fade: .42, items: [[X2 + 240, Y2], [X2 + 660, Y2]] });
+  const Y3 = 880, X3 = 640;
+  line('migrate-db', 'run 6b90', Y3, [[X3, 'snapshot', { lamp: P.green, screen: SCREENS.list }], [X3 + 300, 'dry_run', { lamp: P.blue, screen: SCREENS.agent }], [X3 + 600, 'verify', { lamp: P.green, glyph: '◇', screen: SCREENS.test }]], { fade: .42, items: [[X3 + 250, Y3]] });
+  // the counter plate
+  x.save(); x.shadowColor = 'rgba(0,0,0,.7)'; x.shadowBlur = 24; x.fillStyle = P.steel; rr(1560, 930, 288, 92, 7); x.fill(); x.restore(); x.strokeStyle = P.ghi; x.lineWidth = 1.5; rr(1560.5, 930.5, 287, 91, 7); x.stroke();
+  label('RUNS TODAY', 1584, 954, P.ink3, 11);
+  x.fillStyle = P.bluehi; x.font = MONO(600, 40); x.textBaseline = 'middle'; x.fillText('1,284', 1584, 990);
+  x.save(); x.shadowColor = P.green; x.shadowBlur = 12; x.fillStyle = P.green; x.beginPath(); x.arc(1826, 954, 4, 0, 7); x.fill(); x.restore();
+  window.drawn = true;
+}
+draw();
+</script></div></body></html>

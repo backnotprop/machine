@@ -1,0 +1,7 @@
+{
+  "name": "changelog-blocked",
+  "machine": "examples/changelog-draft.machine.json",
+  "inputs": { "repo_path": "$FIXTURE", "version": "0.2.0" },
+  "setup": "git init -q && git config user.email a@b.c && git config user.name t && echo '# demo' > README.md && git add -A && git commit -qm 'Initial project scaffold' && git tag v0.1.0 && echo 'export const sub=(a,b)=>a-b' > math.js && git add -A && git commit -qm 'Add sub() to math helper'",
+  "expect": { "status": "blocked", "state": "collect", "max_rejected": 0, "file_absent": [".changelog-author", "CHANGELOG.md"] }
+}

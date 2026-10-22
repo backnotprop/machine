@@ -1,0 +1,12 @@
+@font-face { font-family: "Geist Sans"; font-weight: 400; src: url("/Users/ramos/oss/machine/node_modules/@fontsource/geist-sans/files/geist-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Geist Sans"; font-weight: 500; src: url("/Users/ramos/oss/machine/node_modules/@fontsource/geist-sans/files/geist-sans-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Geist Sans"; font-weight: 600; src: url("/Users/ramos/oss/machine/node_modules/@fontsource/geist-sans/files/geist-sans-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Geist Sans"; font-weight: 700; src: url("/Users/ramos/oss/machine/node_modules/@fontsource/geist-sans/files/geist-sans-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Geist Mono"; font-weight: 400; src: url("/Users/ramos/oss/machine/node_modules/@fontsource/geist-mono/files/geist-mono-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Geist Mono"; font-weight: 500; src: url("/Users/ramos/oss/machine/node_modules/@fontsource/geist-mono/files/geist-mono-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Geist Mono"; font-weight: 600; src: url("/Users/ramos/oss/machine/node_modules/@fontsource/geist-mono/files/geist-mono-latin-600-normal.woff2") format("woff2"); }
+:root { --page: #0a0a0c; --ink: #ededef; --ink-2: #a3a3ad; --ink-3: #85858f; --ink-4: #4a4a53; --g-lo: #2e2e35; --g: #3a3a42; --g-hi: #55555e; --blue: #3b82f6; --blue-hi: #93c2ff; --red: #ff5d62; --red-hi: #ffa3a5; --amber: #f2b45a; --amber-hi: #ffd9a1; --green: #6ee7a0; --done: #e9e9ee; --sans: "Geist Sans", system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, monospace; }
+html, body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--page); }
+@font-face { font-family: "IoskeleyMono"; font-weight: 400; src: url("/Users/ramos/oss/machine/src/ui/public/fonts/IoskeleyMono-Regular.woff2") format("woff2"); }
+@font-face { font-family: "IoskeleyMono"; font-weight: 500; src: url("/Users/ramos/oss/machine/src/ui/public/fonts/IoskeleyMono-Medium.woff2") format("woff2"); }

@@ -1,0 +1,188 @@
+{
+  "id": "ship-fix",
+  "version": 2,
+  "name": "Ship a bug fix",
+  "description": "Take a bug report to a merged pull request: reproduce, fix, prove it with tests, open the PR, wait for review.",
+  "inputs": {
+    "issue_url": {
+      "type": "string",
+      "required": true,
+      "description": "Link to the bug report or issue"
+    },
+    "repo_path": {
+      "type": "string",
+      "required": true,
+      "description": "Absolute path to the checked-out repository"
+    },
+    "base_branch": {
+      "type": "string",
+      "required": false,
+      "description": "Branch to open the PR against (default main)"
+    }
+  },
+  "requirements": [
+    {
+      "id": "clean-tree",
+      "description": "Working tree has no uncommitted changes",
+      "check": "Run `git status --porcelain` in repo_path; ok if output is empty"
+    },
+    {
+      "id": "tests-run",
+      "description": "The test suite can be executed",
+      "check": "Find the test command (package.json scripts, Makefile, CI config) and run it once; ok if it starts and finishes, even with failures"
+    }
+  ],
+  "credentials": [
+    {
+      "id": "github",
+      "provider": "github",
+      "why": "push the fix branch and open the pull request"
+    }
+  ],
+  "initial": "reproduce",
+  "states": {
+    "reproduce": {
+      "kind": "task",
+      "title": "Reproduce the bug",
+      "instructions": "Read the issue. Write a failing test, or find a command, that demonstrates the bug on the current code. Do not change production code yet.",
+      "credentials": [],
+      "output": {
+        "repro": {
+          "type": "string",
+          "required": true,
+          "description": "Test name or command that fails because of the bug"
+        },
+        "summary": {
+          "type": "string",
+          "required": true,
+          "description": "One sentence: what is wrong and where"
+        }
+      },
+      "on": {
+        "reproduced": {
+          "to": "fix",
+          "description": "You have a failing test or command that shows the bug"
+        },
+        "cannot_reproduce": {
+          "to": "needs_info",
+          "description": "The report is not enough to reproduce it"
+        }
+      }
+    },
+    "fix": {
+      "kind": "task",
+      "title": "Write the fix",
+      "instructions": "Make the smallest change that fixes the cause, not the symptom. Keep the reproduction test. Commit on a branch named fix/<short-slug>.",
+      "credentials": [],
+      "output": {
+        "branch": {
+          "type": "string",
+          "required": true
+        },
+        "files_changed": {
+          "type": "array",
+          "required": true,
+          "description": "Paths touched by the fix"
+        }
+      },
+      "on": {
+        "fixed": {
+          "to": "verify"
+        }
+      }
+    },
+    "verify": {
+      "kind": "decision",
+      "title": "Run the full test suite",
+      "instructions": "Run the whole suite, not just the new test. Report the exact command and result.",
+      "credentials": [],
+      "output": {
+        "command": {
+          "type": "string",
+          "required": true
+        },
+        "result": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "failing": {
+          "type": "array",
+          "required": false,
+          "description": "Names of failing tests, if any"
+        }
+      },
+      "on": {
+        "pass": {
+          "to": "open_pr",
+          "description": "Everything passes"
+        },
+        "fail": {
+          "to": "fix",
+          "description": "Something fails; go back and fix."
+        }
+      }
+    },
+    "open_pr": {
+      "kind": "task",
+      "title": "Open the pull request",
+      "instructions": "Push the branch and open a PR against base_branch (default main): `machine run <run_id> -- git push -u origin <branch>` then `machine run <run_id> -- gh pr create --fill` (the github slot is live only here). Body: what was wrong, what changed, how it was verified, link to issue_url.",
+      "credentials": [
+        "github"
+      ],
+      "output": {
+        "pr_url": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "on": {
+        "opened": {
+          "to": "await_review"
+        }
+      }
+    },
+    "await_review": {
+      "kind": "wait",
+      "title": "Wait for human review",
+      "on": {
+        "approved": {
+          "to": "merged",
+          "actor": "human"
+        },
+        "changes_requested": {
+          "to": "fix",
+          "actor": "human",
+          "description": "Reviewer wants changes; the comment thread says what"
+        }
+      }
+    },
+    "needs_info": {
+      "kind": "wait",
+      "title": "Need more information from the reporter",
+      "on": {
+        "info_provided": {
+          "to": "reproduce",
+          "actor": "human"
+        },
+        "wont_fix": {
+          "to": "abandoned",
+          "actor": "human"
+        }
+      }
+    },
+    "merged": {
+      "kind": "final",
+      "title": "Merged",
+      "outcome": "success"
+    },
+    "abandoned": {
+      "kind": "final",
+      "title": "Abandoned",
+      "outcome": "failure"
+    }
+  }
+}
