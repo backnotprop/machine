@@ -13,7 +13,7 @@ export function SignIn() {
     <div className="page">
       <div className="signin">
         <img className="badge" src="/brand/gt-badge.svg" alt="machine" height={44} />
-        <p>Processes you draw. Agents follow them. A tool keeps them on the rails.</p>
+        <p>State machines for coding agents.</p>
         <EmptyPath n={4} />
         <a className="pill primary" href={loginHref()}>Sign in</a>
         <span className="hint">Opens WorkOS. If someone invited you, use the email the invitation came to.</span>
