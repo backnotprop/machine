@@ -13,9 +13,9 @@
         "@fontsource/jetbrains-mono": "^5.3.0",
         "@modelcontextprotocol/hono": "^2.0.2",
         "@modelcontextprotocol/server": "^2.3.1",
-        "@plannotator/byoa-connector-core": "^0.1.0",
+        "@plannotator/byoa-connector-core": "^0.1.3",
         "@plannotator/byoa-protocol": "^0.1.0",
-        "@plannotator/byoa-server": "^0.1.0",
+        "@plannotator/byoa-server": "^0.1.3",
         "@workos-inc/node": "^11.0.0",
         "ajv": "8",
         "hono": "^4.13.13",
@@ -58,11 +58,11 @@
 
     "@oxc-project/types": ["@oxc-project/types@0.154.0", "", {}, "sha512-KYOUGQFlLWR+s4QMV2Q9ko38TZm7EdO87Qm7rvZLqk/webse/cDjtyxKhg/47l0byCbs/k46LT8qc4PKjAikzA=="],
 
-    "@plannotator/byoa-connector-core": ["@plannotator/byoa-connector-core@0.1.0", "", { "dependencies": { "@plannotator/byoa-protocol": "0.1.0" } }, "sha512-DDgCZVKRjepBouNdxOaRguPl06wLACOiXs6ncKDWWHq6tTT/HRH9tG15hA5023N6x0YcV1u/E23aG4XlorZ+ig=="],
+    "@plannotator/byoa-connector-core": ["@plannotator/byoa-connector-core@0.1.3", "", { "dependencies": { "@plannotator/byoa-protocol": "^0.1.0" } }, "sha512-RuPoHEF3pvgHvtatd/FdS9bmE6NPCynEGqUHjVf8S98zIN2APNLZ8cnrK1AQ0Pha8lXfyid+8UvZcmmtA8qFyA=="],
 
     "@plannotator/byoa-protocol": ["@plannotator/byoa-protocol@0.1.0", "", {}, "sha512-4FLFeu7zjw/kAd8H9e0VVi+zOYrV5BY/TYUwWjnGxpxw8re/ucHbmkm703ZeY09e7Ahql8i9lJJr4m5kFCUkOQ=="],
 
-    "@plannotator/byoa-server": ["@plannotator/byoa-server@0.1.0", "", { "dependencies": { "@plannotator/byoa-protocol": "0.1.0" } }, "sha512-4whEtEI6cL5xWbkbIPm29Gs/n4TEd4fT6pvXpk/U8vT7qWC4pJSjg47pAkYR+VHz/2VLw7IIwgvfhqFgeTmMZA=="],
+    "@plannotator/byoa-server": ["@plannotator/byoa-server@0.1.3", "", { "dependencies": { "@plannotator/byoa-protocol": "^0.1.0" } }, "sha512-EItSNKrvoTj/pDT62BaQT10Tgj0M8017LHnz5ucB7K/GFZXDYFAXdUwdpFoe/cxA6m0yJKgrYAUwoFwj0OXWzQ=="],
 
     "@rolldown/binding-android-arm-eabi": ["@rolldown/binding-android-arm-eabi@1.2.14", "", { "os": "android", "cpu": "arm" }, "sha512-aWR+XKH9+rW7m5fWq/5360J3mHycrx/o6xZM2DQFdJnTMdyP7/WzxPjhtLbVWdKo2y612/4U1bWqb3HQhiF7vg=="],
 
