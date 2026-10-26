@@ -4,7 +4,7 @@ State machines for coding agents.
 
 You write a workflow as a state machine. An agent runs it by calling MCP tools. The server checks every call against the machine and rejects any move the machine does not allow. You watch the run live.
 
-Licence: FSL-1.1-MIT. Needs [Bun](https://bun.sh) 1.3+.
+[Watch Video Demo Here](https://x.com/backnotprop/status/2113354057054126238?s=20)
 
 ## The machine
 
